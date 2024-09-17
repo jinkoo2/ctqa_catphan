@@ -4,11 +4,22 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk  # For progress bar
 import threading
+import time
 from util import log, obj_serializer, read_json_file
 from pylinac import CatPhan604, CatPhan600, CatPhan504, CatPhan503
-import time
 
 SETTINGS_FILE = 'settings.json'
+
+# Splash Screen
+def show_splash_screen():
+    splash = tk.Tk()
+    splash.overrideredirect(True)  # Hide window borders and controls
+    splash.geometry("300x200+500+300")  # Set the position and size of the splash screen
+    splash_label = tk.Label(splash, text="Loading CT QA App...", font=("Helvetica", 16))
+    splash_label.pack(expand=True)
+    splash.update()
+    time.sleep(2)  # Simulate some loading time (2 seconds)
+    splash.destroy()  # Close the splash screen
 
 class CTQAGuiApp:
     def __init__(self, root):
@@ -201,6 +212,10 @@ class CTQAGuiApp:
 
 # Main Application
 if __name__ == "__main__":
+    # Show the splash screen first
+    show_splash_screen()
+
+    # Start the main application after splash
     root = tk.Tk()
     app = CTQAGuiApp(root)
     root.mainloop()
