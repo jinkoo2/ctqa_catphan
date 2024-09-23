@@ -6,7 +6,7 @@
         "thickness_tolerance": 0.2,
         "low_contrast_tolerance": 1,
         "cnr_threshold": 15,
-        "zip_after": 0,
+        "zip_after": true,
         "contrast_method": "Michelson",
         "visibility_threshold": 0.15,
         "thickness_slice_straddle": "auto",
@@ -25,8 +25,15 @@
     "publish_pdf_params":{
         "filename": "result.pdf",
         "notes": "This is notes",
-        "open_file": 0,
-        "metadata": {"PerformedBy": "Jinkoo Kim"},
+        "open_file": true,
+        "metadata": {},
         "logo": "C:/Users/jkim20/Documents/ctqa_catphan/logo.jpg"
-    }
+    },
+    "users": [ 
+        "Jinkoo|jinkoo.kim@stonybrookmedicine.edu",
+        "Ting|An.Hsia@stonybrookmedicine.edu",
+        "Xin|Xin.Qian@stonybrookmedicine.edu",
+        "Renee|Renee.Cattell@stonybrookmedicine.edu",
+        "Andrew|Yizhou.Zhao@stonybrookmedicine.edu"
+    ]   
 }
