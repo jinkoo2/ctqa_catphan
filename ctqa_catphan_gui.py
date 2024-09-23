@@ -8,6 +8,7 @@ import threading
 import time
 from util import log, obj_serializer, read_json_file
 from pylinac import CatPhan604, CatPhan600, CatPhan504, CatPhan503
+import shutil
 
 SETTINGS_FILE = 'settings.json'
 
@@ -96,15 +97,27 @@ class CTQAGuiApp:
         self.run_button = tk.Button(root, text="Run Analysis", command=self.run_analysis_thread)
         self.run_button.pack(pady=10)
 
-        # Progress bar and status label
-        self.progress_label = tk.Label(root, text="")
-        self.progress_label.pack(pady=5)
-        self.progress_bar = ttk.Progressbar(root, mode="indeterminate")
-        self.progress_bar.pack(fill="x", padx=5, pady=5)
+       
+        # Create a frame to hold the Text widget and the Scrollbar for log output
+        self.log_frame = tk.Frame(root)
+        self.log_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Log output area
-        self.log_output = tk.Text(root, height=10, wrap="word")
-        self.log_output.pack(fill="x", padx=5, pady=5)
+        # Create a Scrollbar
+        self.scrollbar = tk.Scrollbar(self.log_frame)
+        self.scrollbar.pack(side="right", fill="y")
+
+        # Create the Text widget for logging messages
+        self.log_output = tk.Text(self.log_frame, wrap="word", yscrollcommand=self.scrollbar.set)
+        self.log_output.pack(side="left", fill="both", expand=True)
+
+        # Configure the Scrollbar to work with the Text widget
+        self.scrollbar.config(command=self.log_output.yview)
+
+        # Progress bar and status label at the bottom of the window
+        self.progress_label = tk.Label(root, text="")
+        self.progress_label.pack(side="bottom", pady=5)
+        self.progress_bar = ttk.Progressbar(root, mode="indeterminate")
+        self.progress_bar.pack(side="bottom", fill="x", padx=5, pady=5)
 
         # Set up the exit event to save settings
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -231,6 +244,36 @@ class CTQAGuiApp:
                 expected_hu_values=params['expected_hu_values']
             )
 
+            file = os.path.join(output_dir, 'analyzed_image.png')
+            self.log_message(f'saving image: {file}')
+            ct.save_analyzed_image(filename=file)
+            
+            sub_image_header = os.path.join(output_dir, 'analyzed_subimage')
+            #* ``hu`` draws the HU linearity image.
+            #* ``un`` draws the HU uniformity image.
+            #* ``sp`` draws the Spatial Resolution image.
+            #* ``lc`` draws the Low Contrast image (if applicable).
+            #* ``mtf`` draws the RMTF plot.
+            #* ``lin`` draws the HU linearity values. Used with ``delta``.
+            #* ``prof`` draws the HU uniformity profiles.
+            #* ``side`` draws the side view of the phantom with lines of the module locations.
+            sub_image_list = ['hu', 'un', 'sp', 'lc', 'mtf', 'lin', 'prof', 'side']
+            for sub in sub_image_list:
+                try:
+                    dst = f'{sub_image_header}.{sub}.png'
+                    self.log_message(f'saving sub image: {dst}')
+                    ct.save_analyzed_subimage(filename=dst, subimage=sub)
+                except:
+                    pass
+
+            # copy logo file
+            logo_file = config['publish_pdf_params']['logo']
+            if os.path.exists(logo_file):
+                log_filename = os.path.basename(logo_file)
+                dst = os.path.join(output_dir, log_filename)
+                self.log_message(f'Saving logo file: {dst}')
+                shutil.copy(logo_file, dst)
+            
             # Save the results as PDF, TXT, and JSON
             result_pdf = os.path.join(output_dir, config['publish_pdf_params']['filename'])
             self.log_message(f'Saving result PDF: {result_pdf}')
