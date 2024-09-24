@@ -1,4 +1,4 @@
 pyinstaller
 pylinac
 tkcalendar
-
+requests

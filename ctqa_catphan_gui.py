@@ -9,6 +9,7 @@ import time
 from util import log, obj_serializer, read_json_file
 from pylinac import CatPhan604, CatPhan600, CatPhan504, CatPhan503
 import shutil
+import requests
 
 SETTINGS_FILE = 'settings.json'
 
@@ -97,6 +98,9 @@ class CTQAGuiApp:
         self.run_button = tk.Button(root, text="Run Analysis", command=self.run_analysis_thread)
         self.run_button.pack(pady=10)
 
+        # Create "Record" button
+        self.record_button = tk.Button(root, text="Record", command=self.record_result)
+        self.record_button.pack(pady=10)
        
         # Create a frame to hold the Text widget and the Scrollbar for log output
         self.log_frame = tk.Frame(root)
@@ -244,6 +248,9 @@ class CTQAGuiApp:
                 expected_hu_values=params['expected_hu_values']
             )
 
+            # print results
+            self.log_message(ct.results())
+
             file = os.path.join(output_dir, 'analyzed_image.png')
             self.log_message(f'saving image: {file}')
             ct.save_analyzed_image(filename=file)
@@ -285,7 +292,6 @@ class CTQAGuiApp:
             
             notes = self.notes_text.get("1.0", tk.END).strip()
 
-
             ct.publish_pdf(
                 filename=result_pdf,
                 notes=notes,
@@ -299,9 +305,16 @@ class CTQAGuiApp:
             with open(result_txt, 'w') as file:
                 file.write(ct.results())
 
+            
+
             result = ct.results_data()
             result_json = os.path.join(output_dir, 'result.json')
             result_dict = json.loads(json.dumps(vars(result), default=obj_serializer))
+            result_dict['performed_by'] = self.performed_by_combobox.get()
+            result_dict['performed_on'] = self.performed_date_entry.get() 
+            result_dict['notes'] =notes 
+            result_dict['config'] = config
+
             self.log_message(f'Saving result JSON: {result_json}')
             with open(result_json, 'w') as json_file:
                 json.dump(result_dict, json_file, indent=4)
@@ -341,6 +354,38 @@ class CTQAGuiApp:
         # Save the settings when the app is closed
         self.save_settings()
         self.root.destroy()
+
+    def record_result(self):
+        try:
+            # Ensure the result.json file exists
+            result_json = os.path.join(self.output_folder_path.cget("text"), 'result.json')
+
+            if not os.path.exists(result_json):
+                messagebox.showerror("Error", "The result.json file does not exist. Run the analysis first.")
+                return
+
+            # Read the result.json file
+            with open(result_json, 'r') as json_file:
+                result_data = json.load(json_file)
+
+            # POST the result.json to the API
+            url = 'http://roweb3.uhmc.sbuh.stonybrook.edu:4000/api/catphanresults'
+            headers = {'Content-Type': 'application/json'}
+
+            self.log_message(f'Sending result.json to {url}...')
+            response = requests.post(url, json=result_data, headers=headers)
+
+            # Check if the request was successful
+            if response.status_code == 200:
+                self.log_message("Record successfully sent to the server.")
+                messagebox.showinfo("Success", "Record successfully sent to the server.")
+            else:
+                self.log_message(f"Failed to send record: {response.status_code} - {response.text}")
+                messagebox.showerror("Error", f"Failed to send record: {response.status_code}")
+
+        except Exception as e:
+            self.log_message(f"Error sending record: {str(e)}")
+            messagebox.showerror("Error", f"Error sending record: {str(e)}")
 
 # Main Application
 if __name__ == "__main__":
