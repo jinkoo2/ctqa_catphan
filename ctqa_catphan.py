@@ -120,17 +120,17 @@ def run_analysis(device_id, input_dir, output_dir, config, notes, metadata, log_
 
     log_message('Analysis completed.')
 
-def push_to_server(input_folder, output_folder, config, log_message):
+def push_to_server(result_folder, config, log_message):
     
     temp_folder = config['temp_folder']
     
-    if not input_folder or not os.path.exists(input_folder):
-        raise Exception("The input folder does not exist.")
+    if not result_folder or not os.path.exists(result_folder):
+        raise Exception("The result folder not found.")
     
     # Zip the input folder
-    log_message(f"Zipping input folder: {input_folder}")
-    zip_filepath = util.zip_folder(input_folder, f'catphan_', temp_folder)
-    log_message(f"Input folder zipped at: {zip_filepath}")
+    log_message(f"Zipping input folder: {result_folder}")
+    zip_filepath = util.zip_folder(result_folder, f'catphan_', temp_folder)
+    log_message(f"Result folder zipped at: {zip_filepath}")
     
     # Get the upload URL from config
     zip_upload_url = config['webservice_url'] + '/upload'
@@ -149,7 +149,7 @@ def push_to_server(input_folder, output_folder, config, log_message):
         raise Exception("Failed uplaoding zip file!")
 
     # Ensure the result.json file exists
-    result_json = os.path.join(output_folder, 'result.json')
+    result_json = os.path.join(result_folder, 'result.json')
 
     if not os.path.exists(result_json):
         raise Exception("The result.json file does not exist. Run the analysis first.")

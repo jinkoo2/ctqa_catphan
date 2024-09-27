@@ -13,6 +13,8 @@ import util
 import model_helper
 import webservice_helper
 
+from dicom_chooser import DicomChooser
+
 SETTINGS_FILE = 'settings.json'
 
 # Splash Screen
@@ -225,6 +227,7 @@ class CTQAGuiApp:
         self.log_output.see(tk.END)
 
     def run_analysis_thread(self):
+        
         # Disable the "Run Analysis" button to prevent multiple clicks
         self.run_button.config(state=tk.DISABLED)
         
@@ -255,6 +258,37 @@ class CTQAGuiApp:
             if not output_dir:
                 output_dir = os.path.join(input_dir, 'out')
 
+            dicom_chooser = DicomChooser(self.root, input_dir)
+            dicom_chooser.show_series_selection_popup()
+
+            # Use wait_window to pause execution until the selection window is closed
+            self.root.wait_window(dicom_chooser.series_selection_popup)
+
+            # Get the selection
+            selected_series_name, selected_files = dicom_chooser.get_selection()
+
+            if selected_files:
+                self.log_message(f"Running analysis on series: {selected_series_name}")
+
+                # copy all selected files 
+                catphan_dir = os.path.join(output_dir, 'catphan')
+                if not os.path.exists(catphan_dir):
+                    os.makedirs(catphan_dir)
+
+                import shutil
+                for src_file in selected_files:
+                    filename = os.path.basename(src_file)
+                    dst_file = os.path.join(catphan_dir, filename )
+                    shutil.copy(src_file, dst_file)
+                
+                self.analysis_input_folder = catphan_dir
+                self.analysis_result_folder = catphan_dir
+                    
+            else:
+                self.log_message("No files selected for analysis.")
+                return
+
+
             metadata=self.phantom_config['publish_pdf_params']['metadata']
             metadata['Performed By'] = self.performed_by_combobox.get()
             metadata['Performed Date'] = self.performed_date_entry.get() 
@@ -263,8 +297,8 @@ class CTQAGuiApp:
 
 
             ctqa_catphan.run_analysis(device_id=self.device_id(),
-                input_dir=input_dir, 
-                output_dir=output_dir, 
+                input_dir=self.analysis_input_folder, 
+                output_dir=self.analysis_result_folder, 
                 config = self.phantom_config, 
                 notes=notes, 
                 metadata=metadata, 
@@ -334,6 +368,10 @@ class CTQAGuiApp:
             return None
 
     def record_result_thread(self):
+        
+        if not hasattr(self, 'analysis_result_folder') or not os.path.exists(self.analysis_result_folder):
+            self.log_message('Result folder not present. Please run your analysis first')
+
         # Disable the "Run Analysis" button to prevent multiple clicks
         self.push_to_server_button.config(state=tk.DISABLED)
         
@@ -351,10 +389,7 @@ class CTQAGuiApp:
             if self.phantom().lower() == 'catphan604':    
                 import ctqa_catphan
 
-                input_folder = self.input_folder_path.cget("text")
-                output_folder = self.output_folder_path.cget("text")
-
-                result_data = ctqa_catphan.push_to_server(input_folder=input_folder, output_folder=output_folder, config = self.config, log_message=self.log_message)
+                result_data = ctqa_catphan.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
 
                 # post result as measurements   
                 self.record_result_as_measurement1ds(result_data)
