@@ -6,10 +6,12 @@ from tkcalendar import DateEntry  # Date picker widget
 from tkinter import ttk  # For progress bar
 import threading
 import time
-from util import log, obj_serializer, read_json_file
-from pylinac import CatPhan604, CatPhan600, CatPhan504, CatPhan503
-import shutil
-import requests
+from util import read_json_file
+
+import obj_helper
+import util
+import model_helper
+import webservice_helper
 
 SETTINGS_FILE = 'settings.json'
 
@@ -34,16 +36,31 @@ class CTQAGuiApp:
 
         # Load saved settings
         self.settings = self.load_settings()
-        
+        self.config = self.load_config()
+    
+        # Site, Device, and Phantom Selection Comboboxes
+        self.selection_frame = tk.Frame(root)
+        self.selection_frame.pack(pady=5, padx=5, fill="x")
 
-        # Config file frame (button + label)
-        self.config_frame = tk.Frame(root)
-        self.config_frame.pack(pady=5, padx=5, fill="x")
-        
-        self.config_file_button = tk.Button(self.config_frame, text="Select Config File", command=self.select_config_file)
-        self.config_file_button.pack(side="left", padx=5)
-        self.config_file_path = tk.Label(self.config_frame, text=self.settings.get('config_file', ''), relief=tk.SUNKEN, anchor="w")
-        self.config_file_path.pack(side="left", fill="x", expand=True)
+        # Site selection
+        tk.Label(self.selection_frame, text="Site:").pack(side="left", padx=5)
+        self.site_combobox = ttk.Combobox(self.selection_frame, values=self.config.get('sites', []))
+        self.site_combobox.pack(side="left", fill="x", expand=True)
+
+        # Device selection
+        tk.Label(self.selection_frame, text="Device:").pack(side="left", padx=5)
+        self.device_combobox = ttk.Combobox(self.selection_frame, values=self.config.get('devices', []))
+        self.device_combobox.pack(side="left", fill="x", expand=True)
+
+        # Phantom selection
+        tk.Label(self.selection_frame, text="Phantom:").pack(side="left", padx=5)
+        self.phantom_combobox = ttk.Combobox(self.selection_frame, values=self.config.get('phantoms', []))
+        self.phantom_combobox.pack(side="left", fill="x", expand=True)
+
+        # Set default selections from settings if available
+        self.site_combobox.set(self.settings.get('site', ''))
+        self.device_combobox.set(self.settings.get('device', ''))
+        self.phantom_combobox.set(self.settings.get('phantom', ''))
 
         # Add Performed By Dropdown (Combobox) and Performed Date Entry
         self.user_frame = tk.Frame(root)
@@ -79,8 +96,9 @@ class CTQAGuiApp:
         self.output_frame = tk.Frame(root)
         self.output_frame.pack(pady=5, padx=5, fill="x")
         
-        self.output_folder_button = tk.Button(self.output_frame, text="Select Output Folder", command=self.select_output_folder)
+        self.output_folder_button = tk.Button(self.output_frame, text="Output Folder", command=self.select_output_folder)
         self.output_folder_button.pack(side="left", padx=5)
+        self.output_folder_button.config(state=tk.DISABLED, relief="flat", borderwidth=0, fg="black")
         self.output_folder_path = tk.Label(self.output_frame, text=self.settings.get('output_folder', ''), relief=tk.SUNKEN, anchor="w")
         self.output_folder_path.pack(side="left", fill="x", expand=True)
 
@@ -99,8 +117,8 @@ class CTQAGuiApp:
         self.run_button.pack(pady=10)
 
         # Create "Record" button
-        self.record_button = tk.Button(root, text="Record", command=self.record_result)
-        self.record_button.pack(pady=10)
+        self.push_to_server_button = tk.Button(root, text="Push to server", command=self.record_result_thread)
+        self.push_to_server_button.pack(pady=10)
        
         # Create a frame to hold the Text widget and the Scrollbar for log output
         self.log_frame = tk.Frame(root)
@@ -133,15 +151,61 @@ class CTQAGuiApp:
         if performed_by:
             self.performed_by_combobox.set(performed_by)
 
+    def load_config(self):
+        # config file path
+        current_file_path = os.path.abspath(__file__)
+        current_dir = os.path.dirname(current_file_path)
+        config_file = os.path.join(current_dir, 'config.json')
+
+        if not os.path.exists(config_file):
+            messagebox.showerror("Config file not found. It should be in the same folder of this executablel file")
+            return
+
+        return read_json_file(config_file)
+
+    def site(self):
+        if self.site_combobox.get() == "":
+            raise Exception("Please select a site!")
+            
+        return self.site_combobox.get().strip()
+    
+    def device(self):
+        if self.device_combobox.get() == "":
+            raise Exception("Please select a device!")
+            
+        return self.device_combobox.get().strip()
+    
+    def device_id(self):
+        return f'{self.site()}|{self.device()}'
+    
+    def phantom(self):
+        if self.phantom_combobox.get() == "":
+            raise Exception("Please select a phantom!")
+
+        return self.phantom_combobox.get().strip()
+    
+
+    def load_phantom_config(self):
+        # config file path
+        current_file_path = os.path.abspath(__file__)
+        current_dir = os.path.dirname(current_file_path)
+        
+        site = self.site().lower()
+        device = self.device().lower()
+        phantom = self.phantom().lower()
+
+        config_file = os.path.join(current_dir, f'config.{site}.{device}.{phantom}.json')
+
+        if not os.path.exists(config_file):
+            self.log_message(f"Error:Phantom config file not found. {config_file}")
+            return
+
+        return read_json_file(config_file)
+    
     def populate_performed_by(self):
-        # Read the config file to get the 'users' array and populate the combobox
-        if  self.config_file_path.cget("text"):
-            config = read_json_file(self.config_file_path.cget("text"))
-            users = config.get('users', [])
-            user_list = [user.split('|')[1] for user in users]  # Extract the names from the 'Name|email' format
-            self.performed_by_combobox['values'] = user_list
-        else:
-            self.performed_by_combobox['values'] = []
+        users = self.config.get('users', [])
+        user_list = [user.split('|')[1] for user in users]  # Extract the names from the 'Name|email' format
+        self.performed_by_combobox['values'] = user_list
 
     def select_input_folder(self):
         folder = filedialog.askdirectory()
@@ -156,30 +220,6 @@ class CTQAGuiApp:
         if folder:
             self.output_folder_path.config(text=folder)
 
-    def select_config_file(self):
-        # Open the file dialog for JSON files
-        file = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
-        
-        if file:
-            try:
-                # Try to read the file to ensure it's a valid JSON
-                with open(file, 'r') as f:
-                    config = json.load(f)  # Load the JSON file content
-                
-                # Update the label with the selected file path
-                self.config_file_path.config(text=file)
-
-                # Populate the "Performed By" dropdown (assumes 'users' in the config)
-                self.populate_performed_by()
-            
-            except json.JSONDecodeError:
-                # If the file isn't valid JSON, show an error message
-                messagebox.showerror("Invalid JSON", "The selected file is not a valid JSON file. Please choose a valid JSON file.")
-        
-        else:
-            # If no file was selected (dialog was canceled), just return
-            return
-
     def log_message(self, message):
         self.log_output.insert(tk.END, message + "\n")
         self.log_output.see(tk.END)
@@ -193,137 +233,46 @@ class CTQAGuiApp:
         self.progress_bar.start()
 
         # Run analysis in a separate thread
-        threading.Thread(target=self.run_analysis).start()
+        if self.phantom().lower() =="catphan604":
+            threading.Thread(target=self.run_analysis).start()
+        else:
+            self.log_message(f"Unknown phantom type: {self.phantom()}")
 
     def run_analysis(self):
+        import ctqa_catphan
+
         try:
+
+            self.phantom_config = self.load_phantom_config()
+
             input_dir = self.input_folder_path.cget("text")
             output_dir = self.output_folder_path.cget("text")
-            config_file = self.config_file_path.cget("text")
 
-            if not input_dir or not config_file:
+            if not input_dir:
                 messagebox.showerror("Error", "Please select the input folder and config file.")
                 return
 
             if not output_dir:
                 output_dir = os.path.join(input_dir, 'out')
 
-            self.log_message(f'Input directory: {input_dir}')
-            self.log_message(f'Output directory: {output_dir}')
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-
-            self.log_message(f'Config file: {config_file}')
-            config = read_json_file(config_file)
-
-            # Catphan analysis logic
-            catphan_model = config['catphan_model']
-            self.log_message(f'Phantom model: {catphan_model}')
-            
-            if catphan_model == '604':
-                ct = CatPhan604(input_dir)
-            elif catphan_model == '600':
-                ct = CatPhan600(input_dir)
-            elif catphan_model == '504':
-                ct = CatPhan504(input_dir)
-            elif catphan_model == '503':
-                ct = CatPhan503(input_dir)
-            else:
-                self.log_message(f'Error:Unknown CatPhan model: {catphan_model}!')
-                return
-            
-            self.log_message('Running analysis...')
-            params = config['analysis_params']
-            ct.analyze(
-                hu_tolerance=params['hu_tolerance'],
-                scaling_tolerance=params['scaling_tolerance'],
-                thickness_tolerance=params['thickness_tolerance'],
-                low_contrast_tolerance=params['low_contrast_tolerance'],
-                cnr_threshold=params['cnr_threshold'],
-                #zip_after=params['zip_after'],
-                zip_after=False,
-                contrast_method=params['contrast_method'],
-                visibility_threshold=params['visibility_threshold'],
-                thickness_slice_straddle=params['thickness_slice_straddle'],
-                expected_hu_values=params['expected_hu_values']
-            )
-
-            # print results
-            self.log_message(ct.results())
-
-            file = os.path.join(output_dir, 'analyzed_image.png')
-            self.log_message(f'saving image: {file}')
-            ct.save_analyzed_image(filename=file)
-            
-            sub_image_header = os.path.join(output_dir, 'analyzed_subimage')
-            #* ``hu`` draws the HU linearity image.
-            #* ``un`` draws the HU uniformity image.
-            #* ``sp`` draws the Spatial Resolution image.
-            #* ``lc`` draws the Low Contrast image (if applicable).
-            #* ``mtf`` draws the RMTF plot.
-            #* ``lin`` draws the HU linearity values. Used with ``delta``.
-            #* ``prof`` draws the HU uniformity profiles.
-            #* ``side`` draws the side view of the phantom with lines of the module locations.
-            sub_image_list = ['hu', 'un', 'sp', 'lc', 'mtf', 'lin', 'prof', 'side']
-            for sub in sub_image_list:
-                try:
-                    dst = f'{sub_image_header}.{sub}.png'
-                    self.log_message(f'saving sub image: {dst}')
-                    ct.save_analyzed_subimage(filename=dst, subimage=sub)
-                except:
-                    pass
-
-            # copy logo file
-            logo_file = config['publish_pdf_params']['logo']
-            if os.path.exists(logo_file):
-                log_filename = os.path.basename(logo_file)
-                dst = os.path.join(output_dir, log_filename)
-                self.log_message(f'Saving logo file: {dst}')
-                shutil.copy(logo_file, dst)
-            
-            # Save the results as PDF, TXT, and JSON
-            result_pdf = os.path.join(output_dir, config['publish_pdf_params']['filename'])
-            self.log_message(f'Saving result PDF: {result_pdf}')
-            params = config['publish_pdf_params']
-
-            metadata=params['metadata']
+            metadata=self.phantom_config['publish_pdf_params']['metadata']
             metadata['Performed By'] = self.performed_by_combobox.get()
             metadata['Performed Date'] = self.performed_date_entry.get() 
-            
+
             notes = self.notes_text.get("1.0", tk.END).strip()
 
-            ct.publish_pdf(
-                filename=result_pdf,
-                notes=notes,
-                open_file=True,
-                metadata=metadata,    
-                logo=params['logo']
-            )
 
-            result_txt = os.path.join(output_dir, 'result.txt')
-            self.log_message(f'Saving result TXT: {result_txt}')
-            with open(result_txt, 'w') as file:
-                file.write(ct.results())
-
-            
-
-            result = ct.results_data()
-            result_json = os.path.join(output_dir, 'result.json')
-            result_dict = json.loads(json.dumps(vars(result), default=obj_serializer))
-            result_dict['performed_by'] = self.performed_by_combobox.get()
-            result_dict['performed_on'] = self.performed_date_entry.get() 
-            result_dict['notes'] =notes 
-            result_dict['config'] = config
-
-            self.log_message(f'Saving result JSON: {result_json}')
-            with open(result_json, 'w') as json_file:
-                json.dump(result_dict, json_file, indent=4)
-
-            self.log_message('Analysis completed.')
+            ctqa_catphan.run_analysis(device_id=self.device_id(),
+                input_dir=input_dir, 
+                output_dir=output_dir, 
+                config = self.phantom_config, 
+                notes=notes, 
+                metadata=metadata, 
+                log_message=self.log_message
+                )
 
         except Exception as e:
             self.log_message(f"Error: {str(e)}")
-
         finally:
             # Re-enable the button and stop progress indicator
             self.run_button.config(state=tk.NORMAL)
@@ -335,8 +284,10 @@ class CTQAGuiApp:
         settings = {
             'input_folder': self.input_folder_path.cget("text"),
             'output_folder': self.output_folder_path.cget("text"),
-            'config_file': self.config_file_path.cget("text"),
-            'performed_by': self.performed_by_combobox.get()  # Save the selected value from the combobox
+            'performed_by': self.performed_by_combobox.get(), 
+            'site': self.site_combobox.get(),
+            'device': self.device_combobox.get(),
+            'phantom': self.phantom_combobox.get(),
         }
 
         # Write the settings to the JSON file
@@ -355,37 +306,69 @@ class CTQAGuiApp:
         self.save_settings()
         self.root.destroy()
 
+    def record_result_as_measurement1ds(self, result_data):
+        # Configuration
+        url = self.config['webservice_url'] + '/measurement1ds'
+        app = f'{util.get_app_name()} 1.0.0'
+        site_id = self.site()
+        device_id = self.device()
+
+        # travese the result object and collect numbers
+        self.log_message('collecting numbers from the result file...')
+        kvps = obj_helper.traverse_and_collect_numbers(result_data)
+
+        # convert the numbers key value pairs to measurement objects
+        self.log_message('converting numbers kvps to measurement1d objects...')
+        measurements = model_helper.convert_kvps_to_measurement1d(key_value_pairs=kvps, 
+                                                                key_prefix=f'{self.phantom().lower()}_',
+                                                                device_id=f'{site_id}|{device_id}', 
+                                                                app=app)
+
+        self.log_message(f'posting the measurement1d array to the server... url={url}')
+        res = webservice_helper.post_measurements(measurements, url=url)
+        if res != None:
+            self.log_message("post succeeded!")
+            return res
+        else:
+            self.log_message("post failed!")
+            return None
+
+    def record_result_thread(self):
+        # Disable the "Run Analysis" button to prevent multiple clicks
+        self.push_to_server_button.config(state=tk.DISABLED)
+        
+        # Show progress
+        self.progress_label.config(text="Pushing data to server...")
+        self.progress_bar.start()
+
+        # Run analysis in a separate thread
+        threading.Thread(target=self.record_result).start()
+
     def record_result(self):
+
         try:
-            # Ensure the result.json file exists
-            result_json = os.path.join(self.output_folder_path.cget("text"), 'result.json')
+            
+            if self.phantom().lower() == 'catphan604':    
+                import ctqa_catphan
 
-            if not os.path.exists(result_json):
-                messagebox.showerror("Error", "The result.json file does not exist. Run the analysis first.")
-                return
+                input_folder = self.input_folder_path.cget("text")
+                output_folder = self.output_folder_path.cget("text")
 
-            # Read the result.json file
-            with open(result_json, 'r') as json_file:
-                result_data = json.load(json_file)
+                result_data = ctqa_catphan.push_to_server(input_folder=input_folder, output_folder=output_folder, config = self.config, log_message=self.log_message)
 
-            # POST the result.json to the API
-            url = 'http://roweb3.uhmc.sbuh.stonybrook.edu:4000/api/catphanresults'
-            headers = {'Content-Type': 'application/json'}
-
-            self.log_message(f'Sending result.json to {url}...')
-            response = requests.post(url, json=result_data, headers=headers)
-
-            # Check if the request was successful
-            if response.status_code == 200:
-                self.log_message("Record successfully sent to the server.")
-                messagebox.showinfo("Success", "Record successfully sent to the server.")
+                # post result as measurements   
+                self.record_result_as_measurement1ds(result_data)
             else:
-                self.log_message(f"Failed to send record: {response.status_code} - {response.text}")
-                messagebox.showerror("Error", f"Failed to send record: {response.status_code}")
+                self.log_message(f'Error: unknown phantom: {self.phantom()}')
 
         except Exception as e:
-            self.log_message(f"Error sending record: {str(e)}")
-            messagebox.showerror("Error", f"Error sending record: {str(e)}")
+            self.log_message(f"Error: {str(e)}")
+
+        finally:
+            # Re-enable the button and stop progress indicator
+            self.push_to_server_button.config(state=tk.NORMAL)
+            self.progress_label.config(text="Pushing to the server completed!")
+            self.progress_bar.stop()
 
 # Main Application
 if __name__ == "__main__":

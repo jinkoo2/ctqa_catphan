@@ -1,6 +1,8 @@
 {
     "input_folder": "D:/Temp/20190529_000000",
     "output_folder": "D:/Temp/20190529_000000\\out",
-    "config_file": "C:/Users/jkim20/Documents/ctqa_catphan/config.json",
-    "performed_by": "An.Hsia@stonybrookmedicine.edu"
+    "performed_by": "jinkoo.kim@stonybrookmedicine.edu",
+    "site": "PFCC",
+    "device": "TruebeamSH",
+    "phantom": "CatPhan604"
 }
