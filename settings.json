@@ -1,8 +1,8 @@
 {
-    "input_folder": "D:/Temp/20190529_000000",
-    "output_folder": "D:/Temp/20190529_000000\\out",
+    "input_folder": "D:/Temp/image qa/mv",
+    "output_folder": "D:/Temp/image qa/mv\\out",
     "performed_by": "jinkoo.kim@stonybrookmedicine.edu",
-    "site": "PFCC",
-    "device": "TruebeamSH",
-    "phantom": "CatPhan604"
+    "site": "SBUH",
+    "device": "Truebeam",
+    "phantom": "QC3"
 }

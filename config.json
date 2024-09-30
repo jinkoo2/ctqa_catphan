@@ -1,10 +1,47 @@
 {
     "sites": [
-        "SBUH", 
-        "PFCC"         
+        {
+            "id": "SBUH",
+            "devices": [
+                {
+                    "id": "Truebeam"
+                },
+                {
+                    "id": "SIL"
+                },
+                {
+                    "id": "Edge"
+                }
+            ]
+        },
+        {
+            "id": "PFCC",
+            "devices": [
+                {
+                    "id": "TruebeamSH"
+                }
+            ]
+        }
     ],
-    "devices": [ "TruebeamSH" ],
-    "phantoms": ["CatPhan604"],
+    "phantoms": [
+        {
+            "id": "CatPhan504",
+            "name": "CatPhan504"
+        },
+        {
+            "id": "CatPhan604",
+            "name": "CatPhan604"
+        }
+        ,
+        {
+            "id": "QCkV",
+            "name": "Standard Imaging QC-kV"
+        },
+        {
+            "id": "QC3",
+            "name": "Standard Imaging QC-3 (MV)"
+        }
+    ],
     "users": [
         "Jinkoo|jinkoo.kim@stonybrookmedicine.edu",
         "Ting|An.Hsia@stonybrookmedicine.edu",

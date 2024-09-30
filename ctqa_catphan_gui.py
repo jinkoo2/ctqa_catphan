@@ -13,7 +13,7 @@ import util
 import model_helper
 import webservice_helper
 
-from dicom_chooser import DicomChooser
+from dicom_chooser import DicomChooser, SelectionMode
 
 SETTINGS_FILE = 'settings.json'
 
@@ -28,6 +28,14 @@ def show_splash_screen():
     time.sleep(2)  # Simulate some loading time (2 seconds)
     splash.destroy()  # Close the splash screen
 
+def find_obj_of_id(objs, id):
+    for obj in objs:
+        if obj["id"] == id:
+            return obj
+
+def get_obj_id_list(objs):
+    return [obj["id"] for obj in objs]
+                  
 class CTQAGuiApp:
     def __init__(self, root):
         self.root = root
@@ -46,21 +54,27 @@ class CTQAGuiApp:
 
         # Site selection
         tk.Label(self.selection_frame, text="Site:").pack(side="left", padx=5)
-        self.site_combobox = ttk.Combobox(self.selection_frame, values=self.config.get('sites', []))
+        
+        sites = self.config["sites"]
+        site_ids = get_obj_id_list(sites)
+        self.site_combobox = ttk.Combobox(self.selection_frame, values=site_ids)
         self.site_combobox.pack(side="left", fill="x", expand=True)
+        self.site_combobox.bind('<<ComboboxSelected>>', self.on_site_combobox_changed)
 
         # Device selection
         tk.Label(self.selection_frame, text="Device:").pack(side="left", padx=5)
-        self.device_combobox = ttk.Combobox(self.selection_frame, values=self.config.get('devices', []))
+        self.device_combobox = ttk.Combobox(self.selection_frame, values=[""])
         self.device_combobox.pack(side="left", fill="x", expand=True)
 
         # Phantom selection
         tk.Label(self.selection_frame, text="Phantom:").pack(side="left", padx=5)
-        self.phantom_combobox = ttk.Combobox(self.selection_frame, values=self.config.get('phantoms', []))
+        phantoms = self.config.get('phantoms', [])
+        self.phantom_combobox = ttk.Combobox(self.selection_frame, values=get_obj_id_list(phantoms))
         self.phantom_combobox.pack(side="left", fill="x", expand=True)
 
         # Set default selections from settings if available
         self.site_combobox.set(self.settings.get('site', ''))
+        self.on_site_combobox_changed({})
         self.device_combobox.set(self.settings.get('device', ''))
         self.phantom_combobox.set(self.settings.get('phantom', ''))
 
@@ -153,6 +167,30 @@ class CTQAGuiApp:
         if performed_by:
             self.performed_by_combobox.set(performed_by)
 
+
+
+    def on_site_combobox_changed(self, event):
+        selected_value = self.site_combobox.get()
+        print(f"Selected value: {selected_value}")
+
+        if selected_value==None or selected_value=="":
+            self.device_combobox.set('')
+            self.device_combobox['values']=()
+            return 
+        
+        sites = self.config.get('sites', [])
+
+        site = find_obj_of_id(sites, selected_value)        
+        if site == None:
+            self.log_message("site not found in the configuration file.")
+            return 
+        
+        devices = site["devices"]
+        device_ids = get_obj_id_list(devices)
+
+        self.device_combobox['values'] = device_ids
+        self.device_combobox.set('')
+
     def load_config(self):
         # config file path
         current_file_path = os.path.abspath(__file__)
@@ -199,7 +237,7 @@ class CTQAGuiApp:
         config_file = os.path.join(current_dir, f'config.{site}.{device}.{phantom}.json')
 
         if not os.path.exists(config_file):
-            self.log_message(f"Error:Phantom config file not found. {config_file}")
+            raise Exception(f"Error:Phantom config file not found. {config_file}")
             return
 
         return read_json_file(config_file)
@@ -229,82 +267,29 @@ class CTQAGuiApp:
     def run_analysis_thread(self):
         
         # Disable the "Run Analysis" button to prevent multiple clicks
-        self.run_button.config(state=tk.DISABLED)
+        # self.run_button.config(state=tk.DISABLED)
         
         # Show progress
         self.progress_label.config(text="Running analysis...")
         self.progress_bar.start()
 
         # Run analysis in a separate thread
-        if self.phantom().lower() =="catphan604":
-            threading.Thread(target=self.run_analysis).start()
-        else:
-            self.log_message(f"Unknown phantom type: {self.phantom()}")
+        #if self.phantom().lower() in ["catphan604", "catphan504", "qckv", "qc3"] :
+        threading.Thread(target=self.run_analysis).start()
+        #else:
+        #    self.log_message(f"Unknown phantom type: {self.phantom()}")
 
     def run_analysis(self):
-        import ctqa_catphan
-
+        
         try:
-
-            self.phantom_config = self.load_phantom_config()
-
-            input_dir = self.input_folder_path.cget("text")
-            output_dir = self.output_folder_path.cget("text")
-
-            if not input_dir:
-                messagebox.showerror("Error", "Please select the input folder and config file.")
-                return
-
-            if not output_dir:
-                output_dir = os.path.join(input_dir, 'out')
-
-            dicom_chooser = DicomChooser(self.root, input_dir)
-            dicom_chooser.show_series_selection_popup()
-
-            # Use wait_window to pause execution until the selection window is closed
-            self.root.wait_window(dicom_chooser.series_selection_popup)
-
-            # Get the selection
-            selected_series_name, selected_files = dicom_chooser.get_selection()
-
-            if selected_files:
-                self.log_message(f"Running analysis on series: {selected_series_name}")
-
-                # copy all selected files 
-                catphan_dir = os.path.join(output_dir, 'catphan')
-                if not os.path.exists(catphan_dir):
-                    os.makedirs(catphan_dir)
-
-                import shutil
-                for src_file in selected_files:
-                    filename = os.path.basename(src_file)
-                    dst_file = os.path.join(catphan_dir, filename )
-                    shutil.copy(src_file, dst_file)
-                
-                self.analysis_input_folder = catphan_dir
-                self.analysis_result_folder = catphan_dir
-                    
+            if self.phantom().lower() in ['catphan604', 'catphan504']:
+                self.run_analysis_catphan()  
+            elif self.phantom().lower() == 'qckv':
+                self.run_analysis_qckv()
+            elif self.phantom().lower() == 'qc3':
+                self.run_analysis_qc3()
             else:
-                self.log_message("No files selected for analysis.")
-                return
-
-
-            metadata=self.phantom_config['publish_pdf_params']['metadata']
-            metadata['Performed By'] = self.performed_by_combobox.get()
-            metadata['Performed Date'] = self.performed_date_entry.get() 
-
-            notes = self.notes_text.get("1.0", tk.END).strip()
-
-
-            ctqa_catphan.run_analysis(device_id=self.device_id(),
-                input_dir=self.analysis_input_folder, 
-                output_dir=self.analysis_result_folder, 
-                config = self.phantom_config, 
-                notes=notes, 
-                metadata=metadata, 
-                log_message=self.log_message
-                )
-
+                pass
         except Exception as e:
             self.log_message(f"Error: {str(e)}")
         finally:
@@ -312,6 +297,206 @@ class CTQAGuiApp:
             self.run_button.config(state=tk.NORMAL)
             self.progress_label.config(text="Analysis completed.")
             self.progress_bar.stop()
+
+    
+    def run_analysis_qckv(self):
+        import qckv
+
+        self.phantom_config = self.load_phantom_config()
+
+        input_dir = self.input_folder_path.cget("text")
+        output_dir = self.output_folder_path.cget("text")
+
+        if not input_dir:
+            messagebox.showerror("Error", "Please select the input folder and config file.")
+            return
+
+        if not output_dir:
+            output_dir = os.path.join(input_dir, 'out')
+
+        if self.phantom().lower().strip() in ['catphan604', 'catphan504']:
+            selection_mode = SelectionMode.SERIES
+        else:
+            selection_mode = SelectionMode.FILE
+        
+        dicom_chooser = DicomChooser(self.root, input_dir, selection_mode=selection_mode)
+        dicom_chooser.show()
+
+        # Use wait_window to pause execution until the selection window is closed
+        self.root.wait_window(dicom_chooser.window)
+
+        # Get the selection
+        selected_file = dicom_chooser.selected_file
+        self.log_message(f'selected_file={selected_file}')
+
+        if selected_file:
+            # copy all selected files 
+            qckv_dir = os.path.join(output_dir, 'qckv')
+            if not os.path.exists(qckv_dir):
+                os.makedirs(qckv_dir)
+
+            import shutil
+            src_file = selected_file
+            filename = os.path.basename(src_file)
+            dst_file = os.path.join(qckv_dir, filename)
+            shutil.copy(src_file, dst_file)
+            
+            self.analysis_input_file = dst_file
+            self.analysis_result_folder = qckv_dir
+        else:
+            self.log_message("No files selected for analysis.")
+            return
+
+
+        metadata=self.phantom_config['publish_pdf_params']['metadata']
+        metadata['Performed By'] = self.performed_by_combobox.get()
+        metadata['Performed Date'] = self.performed_date_entry.get() 
+
+        notes = self.notes_text.get("1.0", tk.END).strip()
+
+
+        qckv.run_analysis(device_id=self.device_id(),
+            input_file=self.analysis_input_file, 
+            output_dir=self.analysis_result_folder, 
+            config = self.phantom_config, 
+            notes=notes, 
+            metadata=metadata, 
+            log_message=self.log_message
+            )
+
+
+    def run_analysis_qc3(self):
+        import qc3
+
+        self.phantom_config = self.load_phantom_config()
+
+        input_dir = self.input_folder_path.cget("text")
+        output_dir = self.output_folder_path.cget("text")
+
+        if not input_dir:
+            messagebox.showerror("Error", "Please select the input folder and config file.")
+            return
+
+        if not output_dir:
+            output_dir = os.path.join(input_dir, 'out')
+
+        if self.phantom().lower().strip() in ['catphan604', 'catphan504']:
+            selection_mode = SelectionMode.SERIES
+        else:
+            selection_mode = SelectionMode.FILE
+        
+        dicom_chooser = DicomChooser(self.root, input_dir, selection_mode=selection_mode)
+        dicom_chooser.show()
+
+        # Use wait_window to pause execution until the selection window is closed
+        self.root.wait_window(dicom_chooser.window)
+
+        # Get the selection
+        selected_file = dicom_chooser.selected_file
+        self.log_message(f'selected_file={selected_file}')
+
+        if selected_file:
+            # copy all selected files 
+            qc3_dir = os.path.join(output_dir, 'qc3')
+            if not os.path.exists(qc3_dir):
+                os.makedirs(qc3_dir)
+
+            import shutil
+            src_file = selected_file
+            filename = os.path.basename(src_file)
+            dst_file = os.path.join(qc3_dir, filename)
+            shutil.copy(src_file, dst_file)
+            
+            self.analysis_input_file = dst_file
+            self.analysis_result_folder = qc3_dir
+        else:
+            self.log_message("No files selected for analysis.")
+            return
+
+
+        metadata=self.phantom_config['publish_pdf_params']['metadata']
+        metadata['Performed By'] = self.performed_by_combobox.get()
+        metadata['Performed Date'] = self.performed_date_entry.get() 
+
+        notes = self.notes_text.get("1.0", tk.END).strip()
+
+        qc3.run_analysis(device_id=self.device_id(),
+            input_file=self.analysis_input_file, 
+            output_dir=self.analysis_result_folder, 
+            config = self.phantom_config, 
+            notes=notes, 
+            metadata=metadata, 
+            log_message=self.log_message
+            )
+
+    def run_analysis_catphan(self):
+        import catphan
+
+        self.phantom_config = self.load_phantom_config()
+
+        input_dir = self.input_folder_path.cget("text")
+        output_dir = self.output_folder_path.cget("text")
+
+        if not input_dir:
+            messagebox.showerror("Error", "Please select the input folder and config file.")
+            return
+
+        if not output_dir:
+            output_dir = os.path.join(input_dir, 'out')
+
+        if self.phantom().lower().strip() in ['catphan604', 'catphan504']:
+            selection_mode = SelectionMode.SERIES
+        else:
+            selection_mode = SelectionMode.FILE
+        
+        dicom_chooser = DicomChooser(self.root, input_dir, selection_mode=selection_mode)
+        dicom_chooser.show()
+
+        # Use wait_window to pause execution until the selection window is closed
+        self.root.wait_window(dicom_chooser.window)
+
+        # Get the selection
+        selected_series_name, selected_files = dicom_chooser.get_selection()
+
+        if selected_files:
+            self.log_message(f"Running analysis on series: {selected_series_name}")
+
+            # copy all selected files 
+            catphan_dir = os.path.join(output_dir, 'catphan')
+            if not os.path.exists(catphan_dir):
+                os.makedirs(catphan_dir)
+
+            import shutil
+            for src_file in selected_files:
+                filename = os.path.basename(src_file)
+                dst_file = os.path.join(catphan_dir, filename )
+                shutil.copy(src_file, dst_file)
+            
+            self.analysis_input_folder = catphan_dir
+            self.analysis_result_folder = catphan_dir
+                
+        else:
+            self.log_message("No files selected for analysis.")
+            return
+
+
+        metadata=self.phantom_config['publish_pdf_params']['metadata']
+        metadata['Performed By'] = self.performed_by_combobox.get()
+        metadata['Performed Date'] = self.performed_date_entry.get() 
+
+        notes = self.notes_text.get("1.0", tk.END).strip()
+
+
+        catphan.run_analysis(device_id=self.device_id(),
+            input_dir=self.analysis_input_folder, 
+            output_dir=self.analysis_result_folder, 
+            config = self.phantom_config, 
+            notes=notes, 
+            metadata=metadata, 
+            log_message=self.log_message
+            )
+
+
 
     def save_settings(self):
         # Save the current selections in a dictionary
@@ -386,10 +571,10 @@ class CTQAGuiApp:
 
         try:
             
-            if self.phantom().lower() == 'catphan604':    
-                import ctqa_catphan
+            if self.phantom().lower() in ['catphan604', 'catphan504']:    
+                import catphan
 
-                result_data = ctqa_catphan.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
+                result_data = catphan.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
 
                 # post result as measurements   
                 self.record_result_as_measurement1ds(result_data)
@@ -398,6 +583,7 @@ class CTQAGuiApp:
 
         except Exception as e:
             self.log_message(f"Error: {str(e)}")
+            self.progress_bar.stop()
 
         finally:
             # Re-enable the button and stop progress indicator

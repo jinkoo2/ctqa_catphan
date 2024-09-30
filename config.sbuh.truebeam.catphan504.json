@@ -1,0 +1,32 @@
+{
+    "catphan_model": "504",
+    "analysis_params": {
+        "hu_tolerance": 40,
+        "scaling_tolerance": 1,
+        "thickness_tolerance": 0.2,
+        "low_contrast_tolerance": 1,
+        "cnr_threshold": 15,
+        "zip_after": false,
+        "contrast_method": "Michelson",
+        "visibility_threshold": 0.15,
+        "thickness_slice_straddle": "auto",
+        "expected_hu_values": {
+            "Air": -1000.0,
+            "PMP": -186.0,
+            "50% Bone": 848.0,
+            "LDPE": -90.0,
+            "Poly": -34.0,
+            "Acrylic": 139.0,
+            "20% Bone": 293.0,
+            "Delrin": 390.0,
+            "Teflon": 990
+        }
+    },
+    "publish_pdf_params": {
+        "filename": "result.pdf",
+        "notes": "This is notes",
+        "open_file": true,
+        "metadata": {},
+        "logo": "C:/Users/jkim20/Documents/ctqa_catphan/logo.jpg"
+    }
+}

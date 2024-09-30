@@ -6,37 +6,45 @@ from PIL import Image, ImageTk  # For displaying DICOM images as 2D previews
 
 from dicom_helper import parse_dicom_directory, read_dicom_image
 import pydicom
+from enum import Enum
+
+class SelectionMode(Enum):
+    SERIES = 1
+    FILE = 2
 
 class DicomChooser:
-    def __init__(self, root, input_dir):
+    def __init__(self, root, input_dir, selection_mode=SelectionMode.SERIES):
         self.root = root
         self.input_dir = input_dir
-        self.selected_series_name = None
+        self.selected_name = None
         self.selected_files = []
         self.dicom_tree = None  # Store the parsed DICOM structure
         self.tk_image = None  # Store the Tkinter image object
+        self.selection_mode = selection_mode
 
-    def show_series_selection_popup(self):
+    def show(self):
         # Create a new top-level window
-        self.series_selection_popup = tk.Toplevel(self.root)
-        self.series_selection_popup.title("Select a Series")
-
+        self.window = tk.Toplevel(self.root)
+        
+        title = "Select a series" if self.selection_mode==SelectionMode.SERIES else "Select a file"
+        self.window.title = title
         # Set the window size and position
-        self.series_selection_popup.geometry("800x600")
+        self.window.geometry("800x600")
 
         # Label for instructions
-        tk.Label(self.series_selection_popup, text="Please select a series or file to preview:").pack(pady=10)
+        # tk.Label(self.series_selection_popup, text="Please select a series or file to preview:").pack(pady=10)
 
         # Create a treeview to display series under studies and files
-        self.series_tree = ttk.Treeview(self.series_selection_popup)
+        self.series_tree = ttk.Treeview(self.window)
         self.series_tree.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Button to confirm selection
-        select_button = tk.Button(self.series_selection_popup, text="Select", command=self.confirm_series_selection)
+        button_label = "Select Series" if self.selection_mode == SelectionMode.SERIES else 'Select File'
+        select_button = tk.Button(self.window, text=button_label, command=self.on_select_clicked)
         select_button.pack(pady=10)
 
         # Add a frame for image and properties display
-        self.image_properties_frame = tk.Frame(self.series_selection_popup, width=800, height=300)
+        self.image_properties_frame = tk.Frame(self.window, width=800, height=300)
         self.image_properties_frame.pack(fill="both", expand=True)
 
         # Add a canvas to preview the image
@@ -142,11 +150,11 @@ class DicomChooser:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load DICOM image: {e}")
 
-    def confirm_series_selection(self):
+    def on_select_clicked(self):
         # Get the selected series node
         selected_items = self.series_tree.selection()
         if not selected_items:
-            messagebox.showwarning("Selection", "Please select a series.")
+            messagebox.showwarning("Selection", "Please select an item.")
             return
 
         selected_item = selected_items[0]  # Only considering the first selection
@@ -154,25 +162,41 @@ class DicomChooser:
         # Get item values
         item_values = self.series_tree.item(selected_item, 'values')
         
-        # Ensure the item has both study and series UIDs
-        if len(item_values) < 3:
-            messagebox.showwarning("Selection", "Invalid selection. Please select a series node.")
-            return
+        if self.selection_mode == SelectionMode.SERIES:
+            # Ensure the item has both study and series UIDs
+            if len(item_values) < 3:
+                messagebox.showwarning("Selection", "Invalid selection. Please select a series node.")
+                return
 
-        # Retrieve the associated study and series UIDs
-        patient_name, study_uid, series_uid = item_values[:3]
+            # Retrieve the associated study and series UIDs
+            patient_name, study_uid, series_uid = item_values[:3]
         
-        # Fetch the actual files for the selected series from the stored DICOM tree
-        self.selected_files = self.dicom_tree[patient_name][study_uid][series_uid]['files']
+            # Fetch the actual files for the selected series from the stored DICOM tree
+            self.selected_files = self.dicom_tree[patient_name][study_uid][series_uid]['files']
 
-        # Get the label of the selected series
-        self.selected_series_name = self.series_tree.item(selected_item)['text']
+            # Get the label of the selected series
+            self.selected_name = self.series_tree.item(selected_item)['text']
+
+        else:
+            # selected filename
+            selected_item_value = self.series_tree.item(selected_item, 'values')
+            self.selected_file = selected_item_value[0]
 
         # Close the popup window
-        self.series_selection_popup.destroy()
+        self.window.destroy()
 
     def get_selection(self):
-        # Returns the selected series name and files
-        if self.selected_series_name is None or not self.selected_files:
-            raise ValueError("No series selected.")
-        return self.selected_series_name, self.selected_files
+        if self.selection_mode == SelectionMode.SERIES:
+            # Returns the selected series name and files
+            if self.selected_name is None or not self.selected_files:
+                raise ValueError("No series selected.")
+            return self.selected_name, self.selected_files
+        elif self.selection_mode == SelectionMode.FILE:
+            # Returns the selected series name and files
+            if self.selected_file is None or not self.selected_file:
+                raise ValueError("No file selected.")
+            return self.selected_file
+        else:
+            pass
+            
+
