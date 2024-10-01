@@ -274,10 +274,7 @@ class CTQAGuiApp:
         self.progress_bar.start()
 
         # Run analysis in a separate thread
-        #if self.phantom().lower() in ["catphan604", "catphan504", "qckv", "qc3"] :
         threading.Thread(target=self.run_analysis).start()
-        #else:
-        #    self.log_message(f"Unknown phantom type: {self.phantom()}")
 
     def run_analysis(self):
         
@@ -288,6 +285,8 @@ class CTQAGuiApp:
                 self.run_analysis_qckv()
             elif self.phantom().lower() == 'qc3':
                 self.run_analysis_qc3()
+            elif self.phantom().lower() == 'fc2':
+                self.run_analysis_fc2()
             else:
                 pass
         except Exception as e:
@@ -426,6 +425,70 @@ class CTQAGuiApp:
             metadata=metadata, 
             log_message=self.log_message
             )
+
+
+    def run_analysis_fc2(self):
+        import fc2
+
+        self.phantom_config = self.load_phantom_config()
+
+        input_dir = self.input_folder_path.cget("text")
+        output_dir = self.output_folder_path.cget("text")
+
+        if not input_dir:
+            messagebox.showerror("Error", "Please select the input folder and config file.")
+            return
+
+        if not output_dir:
+            output_dir = os.path.join(input_dir, 'out')
+
+        if self.phantom().lower().strip() in ['catphan604', 'catphan504']:
+            selection_mode = SelectionMode.SERIES
+        else:
+            selection_mode = SelectionMode.FILE
+        
+        dicom_chooser = DicomChooser(self.root, input_dir, selection_mode=selection_mode)
+        dicom_chooser.show()
+
+        # Use wait_window to pause execution until the selection window is closed
+        self.root.wait_window(dicom_chooser.window)
+
+        # Get the selection
+        selected_file = dicom_chooser.selected_file
+        self.log_message(f'selected_file={selected_file}')
+
+        if selected_file:
+            # copy all selected files 
+            phantom_out_dir = os.path.join(output_dir, 'fc2')
+            if not os.path.exists(phantom_out_dir):
+                os.makedirs(phantom_out_dir)
+
+            import shutil
+            src_file = selected_file
+            dst_file = os.path.join(phantom_out_dir, 'input.dcm')
+            shutil.copy(src_file, dst_file)
+            
+            self.analysis_input_file = dst_file
+            self.analysis_result_folder = phantom_out_dir
+        else:
+            self.log_message("No files selected for analysis.")
+            return
+
+        metadata=self.phantom_config['publish_pdf_params']['metadata']
+        metadata['Performed By'] = self.performed_by_combobox.get()
+        metadata['Performed Date'] = self.performed_date_entry.get() 
+
+        notes = self.notes_text.get("1.0", tk.END).strip()
+
+        fc2.run_analysis(device_id=self.device_id(),
+            input_file=self.analysis_input_file, 
+            output_dir=self.analysis_result_folder, 
+            config = self.phantom_config, 
+            notes=notes, 
+            metadata=metadata, 
+            log_message=self.log_message
+            )
+
 
     def run_analysis_catphan(self):
         import catphan
@@ -581,6 +644,11 @@ class CTQAGuiApp:
             elif self.phantom().lower() == 'qckv':
                 import qckv
                 result_data = qckv.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
+                # post result as measurements   
+                self.record_result_as_measurement1ds(result_data)
+            elif self.phantom().lower() == 'fc2':
+                import fc2
+                result_data = fc2.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
                 # post result as measurements   
                 self.record_result_as_measurement1ds(result_data)
             else:

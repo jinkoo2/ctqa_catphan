@@ -1,0 +1,13 @@
+{
+    "analysis_params": {
+        "invert": false, 
+        "fwxm": 50, 
+        "bb_edge_threshold_mm": 10.0
+    },
+    "publish_pdf_params": {
+        "notes": "This is notes",
+        "open_file": true,
+        "metadata": {},
+        "logo": "C:/Users/jkim20/Documents/ctqa_catphan/logo.jpg"
+    }
+}

@@ -8,7 +8,7 @@
             "name": "Python Debugger: Current File with Arguments",
             "type": "debugpy",
             "request": "launch",
-            "program": "ctqa_catphan_gui.py",
+            "program": "pylinac_gui.py",
             "console": "integratedTerminal",
             "args": ["-i", "D:/Temp/20190529_000000", "-c", "C:/Users/jkim20/Documents/ctqa_catphan/config.json"]
         }

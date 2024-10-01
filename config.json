@@ -40,6 +40,10 @@
         {
             "id": "QC3",
             "name": "Standard Imaging QC-3 (MV)"
+        },
+        {
+            "id": "FC2",
+            "name": "Standard Imaging FC-2 (MV)"
         }
     ],
     "users": [
