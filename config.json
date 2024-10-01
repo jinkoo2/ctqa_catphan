@@ -54,5 +54,6 @@
         "Andrew|Yizhou.Zhao@stonybrookmedicine.edu"
     ],
     "webservice_url": "http://roweb3.uhmc.sbuh.stonybrook.edu:4000/api",
-    "temp_folder": "c:\\temp"
+    "temp_folder": "c:\\temp",
+    "output_folder": "u:\\temp\\image_qa"
 }

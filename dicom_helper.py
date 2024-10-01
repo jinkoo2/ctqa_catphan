@@ -2,6 +2,7 @@
 import os
 import pydicom
 import numpy as np
+from datetime import datetime
 
 def parse_dicom_directory(directory, include_subfolders=False):
     dicom_tree = {}
@@ -69,3 +70,58 @@ def get_dicom_image(dicom_data):
     image_array = image_array.astype(np.uint8)
 
     return image_array
+
+def get_acquisition_datetime(dicom_file_path):
+    # Read the DICOM file
+    dicom_data = pydicom.dcmread(dicom_file_path)
+
+    # Extract the acquisition date and time
+    acquisition_date = dicom_data.get('AcquisitionDate', None)
+    acquisition_time = dicom_data.get('AcquisitionTime', None)
+
+    if acquisition_date and acquisition_time:
+        # Pad the time string to ensure it is always 6 characters long (HHMMSS)
+        acquisition_time = acquisition_time[:6].ljust(6, '0')
+
+        # Combine date and time into a datetime object
+        date_time_str = acquisition_date + acquisition_time
+        acquisition_datetime = datetime.strptime(date_time_str, "%Y%m%d%H%M%S")
+        
+        print("Acquisition DateTime:", acquisition_datetime)
+        return acquisition_datetime
+    else:
+        raise Exception("Acquisition Date or Time not found in the DICOM file.")
+
+def get_acquisition_datetime_str(dicom_file_path):
+    # Get the datetime object
+    dt = get_acquisition_datetime(dicom_file_path)
+    
+    # Return formatted string 'yyyyMMdd_HHmmss'
+    return dt.strftime('%Y%m%d_%H%M%S')
+
+def get_study_datetime(dicom_file_path):
+    # Read the DICOM file
+    dicom_data = pydicom.dcmread(dicom_file_path)
+
+    # Extract the study date and time
+    study_date = dicom_data.get('StudyDate', None)
+    study_time = dicom_data.get('StudyTime', None)
+
+    if study_date and study_time:
+        # Pad the study time to ensure it's always 6 characters long (HHMMSS)
+        study_time = study_time[:6].ljust(6, '0')
+
+        # Combine date and time into a datetime object
+        datetime_str = study_date + study_time
+        study_datetime = datetime.strptime(datetime_str, "%Y%m%d%H%M%S")
+        
+        return study_datetime
+    else:
+        raise Exception("Study Date or Time not found in the DICOM file.")
+
+def get_study_datetime_str(dicom_file_path):
+    # Get the datetime object
+    dt = get_study_datetime(dicom_file_path)
+    
+    # Return formatted string 'yyyyMMdd_HHmmss'
+    return dt.strftime('%Y%m%d_%H%M%S')

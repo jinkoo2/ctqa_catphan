@@ -51,3 +51,6 @@ def zip_folder(folder_path, filename_prefix, output_folder_path):
                 zipf.write(file_path, os.path.relpath(file_path, folder_path))
                 
     return zip_filepath
+
+def datetime_to_string_yyyymmdd_hhmmss(dt):
+    return dt.strftime('%Y%m%d_%H%M%S')

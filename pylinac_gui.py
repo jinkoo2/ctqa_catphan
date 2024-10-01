@@ -12,6 +12,7 @@ import obj_helper
 import util
 import model_helper
 import webservice_helper
+import dicom_helper
 
 from dicom_chooser import DicomChooser, SelectionMode
 
@@ -103,7 +104,7 @@ class CTQAGuiApp:
         self.input_frame = tk.Frame(root)
         self.input_frame.pack(pady=5, padx=5, fill="x")
         
-        self.input_folder_button = tk.Button(self.input_frame, text="Select Input Folder", command=self.select_input_folder)
+        self.input_folder_button = tk.Button(self.input_frame, text="Input Folder", command=self.select_input_folder)
         self.input_folder_button.pack(side="left", padx=5)
         self.input_folder_path = tk.Label(self.input_frame, text=self.settings.get('input_folder', ''), relief=tk.SUNKEN, anchor="w")
         self.input_folder_path.pack(side="left", fill="x", expand=True)
@@ -114,8 +115,11 @@ class CTQAGuiApp:
         
         self.output_folder_button = tk.Button(self.output_frame, text="Output Folder", command=self.select_output_folder)
         self.output_folder_button.pack(side="left", padx=5)
-        self.output_folder_button.config(state=tk.DISABLED, relief="flat", borderwidth=0, fg="black")
-        self.output_folder_path = tk.Label(self.output_frame, text=self.settings.get('output_folder', ''), relief=tk.SUNKEN, anchor="w")
+        #self.output_folder_button.config(state=tk.DISABLED, relief="flat", borderwidth=0, fg="black")
+        output_folder = self.settings.get('output_folder', '')
+        if output_folder == '':
+            output_folder = self.config.get('output_folder', '')
+        self.output_folder_path = tk.Label(self.output_frame, text=output_folder, relief=tk.SUNKEN, anchor="w")
         self.output_folder_path.pack(side="left", fill="x", expand=True)
 
         # Notes Section
@@ -251,10 +255,7 @@ class CTQAGuiApp:
         folder = filedialog.askdirectory()
         if folder:
             self.input_folder_path.config(text=folder)
-
-            # set the ouptut path
-            self.output_folder_path.config(text= os.path.join(folder,"out"))
-
+            
     def select_output_folder(self):
         folder = filedialog.askdirectory()
         if folder:
@@ -294,7 +295,6 @@ class CTQAGuiApp:
         finally:
             # Re-enable the button and stop progress indicator
             self.run_button.config(state=tk.NORMAL)
-            self.progress_label.config(text="Analysis completed.")
             self.progress_bar.stop()
 
     
@@ -329,18 +329,16 @@ class CTQAGuiApp:
         self.log_message(f'selected_file={selected_file}')
 
         if selected_file:
-            # copy all selected files 
-            qckv_dir = os.path.join(output_dir, 'qckv')
-            if not os.path.exists(qckv_dir):
-                os.makedirs(qckv_dir)
+            # case output folder
+            case_outdir = self.get_case_output_folder(selected_file)
 
             import shutil
             src_file = selected_file
-            dst_file = os.path.join(qckv_dir, 'input.dcm')
+            dst_file = os.path.join(case_outdir, 'input.dcm')
             shutil.copy(src_file, dst_file)
             
             self.analysis_input_file = dst_file
-            self.analysis_result_folder = qckv_dir
+            self.analysis_result_folder = case_outdir
         else:
             self.log_message("No files selected for analysis.")
             return
@@ -394,18 +392,16 @@ class CTQAGuiApp:
         self.log_message(f'selected_file={selected_file}')
 
         if selected_file:
-            # copy all selected files 
-            qc3_dir = os.path.join(output_dir, 'qc3')
-            if not os.path.exists(qc3_dir):
-                os.makedirs(qc3_dir)
+            # case output folder
+            case_outdir = self.get_case_output_folder(selected_file)
 
             import shutil
             src_file = selected_file
-            dst_file = os.path.join(qc3_dir, 'input.dcm')
+            dst_file = os.path.join(case_outdir, 'input.dcm')
             shutil.copy(src_file, dst_file)
             
             self.analysis_input_file = dst_file
-            self.analysis_result_folder = qc3_dir
+            self.analysis_result_folder = case_outdir
         else:
             self.log_message("No files selected for analysis.")
             return
@@ -458,18 +454,16 @@ class CTQAGuiApp:
         self.log_message(f'selected_file={selected_file}')
 
         if selected_file:
-            # copy all selected files 
-            phantom_out_dir = os.path.join(output_dir, 'fc2')
-            if not os.path.exists(phantom_out_dir):
-                os.makedirs(phantom_out_dir)
+            # case output folder
+            case_outdir = self.get_case_output_folder(selected_file)
 
             import shutil
             src_file = selected_file
-            dst_file = os.path.join(phantom_out_dir, 'input.dcm')
+            dst_file = os.path.join(case_outdir, 'input.dcm')
             shutil.copy(src_file, dst_file)
             
             self.analysis_input_file = dst_file
-            self.analysis_result_folder = phantom_out_dir
+            self.analysis_result_folder = case_outdir
         else:
             self.log_message("No files selected for analysis.")
             return
@@ -490,20 +484,60 @@ class CTQAGuiApp:
             )
 
 
+    def get_input_folder(self):
+
+        intput_folder = self.input_folder_path.cget("text")
+        if intput_folder == '':
+            raise Exception("Please select an input folder")
+        
+        return intput_folder
+
+    def get_output_folder(self):
+        
+        output_folder = self.output_folder_path.cget("text")
+        if output_folder == '':
+            raise Exception("Please select an output folder")
+
+        if not os.path.exists(output_folder):
+            self.log_message(f'output_folder not found. createing a folder: {output_folder}')
+            os.makedirs(output_folder)
+        
+        return output_folder
+    
+    def get_phantom_folder(self):
+        site = self.site()
+        device = self.device()
+        phantom = self.phantom()
+
+        dirname = f'{site.lower()}_{device.lower()}_{phantom.lower()}'
+        folder = os.path.join(self.get_output_folder(), dirname)
+
+        if not os.path.exists(folder):
+            self.log_message(f'folder not found. createing a folder: {folder}')
+            os.makedirs(folder)
+        
+        return folder
+
+    def get_case_output_folder(self, dicom_image_file):
+        # get acquistion datetime
+        acq_dt_str = dicom_helper.get_study_datetime_str(dicom_image_file)
+
+        # copy all selected files 
+        folder = os.path.join(self.get_phantom_folder(), acq_dt_str)
+
+        if not os.path.exists(folder):
+            self.log_message(f'folder not found. createing a folder: {folder}')
+            os.makedirs(folder)
+        
+        return folder
+
     def run_analysis_catphan(self):
         import catphan
 
         self.phantom_config = self.load_phantom_config()
 
-        input_dir = self.input_folder_path.cget("text")
-        output_dir = self.output_folder_path.cget("text")
-
-        if not input_dir:
-            messagebox.showerror("Error", "Please select the input folder and config file.")
-            return
-
-        if not output_dir:
-            output_dir = os.path.join(input_dir, 'out')
+        input_dir =  self.get_input_folder()
+        output_dir = self.get_output_folder()
 
         if self.phantom().lower().strip() in ['catphan604', 'catphan504']:
             selection_mode = SelectionMode.SERIES
@@ -519,34 +553,35 @@ class CTQAGuiApp:
         # Get the selection
         selected_series_name, selected_files = dicom_chooser.get_selection()
 
-        if selected_files:
+        if selected_files and len(selected_files)>1:
             self.log_message(f"Running analysis on series: {selected_series_name}")
+            
+            # case output folder
+            case_outdir = self.get_case_output_folder(selected_files[0])
 
-            # copy all selected files 
-            catphan_dir = os.path.join(output_dir, 'catphan')
-            if not os.path.exists(catphan_dir):
-                os.makedirs(catphan_dir)
+            self.log_message(f'case output folder={case_outdir}')
+            if not os.path.exists(case_outdir):
+                os.makedirs(case_outdir)
 
             import shutil
-            for src_file in selected_files:
-                filename = os.path.basename(src_file)
-                dst_file = os.path.join(catphan_dir, filename )
+            for i, src_file in enumerate(selected_files):
+                src_filename = os.path.basename(src_file)
+                dst_filename = f'input_{str(i).zfill(3)}.dcm'
+                dst_file = os.path.join(case_outdir, dst_filename )
+                self.log_message(f'copying file...{src_file}-->{dst_file}')
                 shutil.copy(src_file, dst_file)
             
-            self.analysis_input_folder = catphan_dir
-            self.analysis_result_folder = catphan_dir
-                
+            self.analysis_input_folder = case_outdir
+            self.analysis_result_folder = case_outdir
         else:
             self.log_message("No files selected for analysis.")
             return
-
 
         metadata=self.phantom_config['publish_pdf_params']['metadata']
         metadata['Performed By'] = self.performed_by_combobox.get()
         metadata['Performed Date'] = self.performed_date_entry.get() 
 
         notes = self.notes_text.get("1.0", tk.END).strip()
-
 
         catphan.run_analysis(device_id=self.device_id(),
             input_dir=self.analysis_input_folder, 
@@ -556,8 +591,6 @@ class CTQAGuiApp:
             metadata=metadata, 
             log_message=self.log_message
             )
-
-
 
     def save_settings(self):
         # Save the current selections in a dictionary
