@@ -3,7 +3,7 @@
         "low_contrast_threshold": 0.05,
         "high_contrast_threshold": 0.5,
         "invert": false,
-        "ssd": "auto",
+        "ssd": 1400.0,
         "low_contrast_method": "Michelson",
         "visibility_threshold": 100,
         "x_adjustment": 0,

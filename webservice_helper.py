@@ -18,16 +18,16 @@ def post_measurements(measurements, url):
     else:
         print(f"Failed to post measurements: {response.status_code} - {response.text}")
         return None
-    
-def post_catphanresult(catphanresult, url):
+ 
+def post(obj, url):
     # POST the result.json to the API
     headers = {'Content-Type': 'application/json'}
 
     print(f'Sending result.json to {url}...')
-    response = requests.post(url, json=catphanresult, headers=headers)
+    response = requests.post(url, json=obj, headers=headers)
 
     # Check if the request was successful
-    if response.status_code == 200:
+    if response.status_code in [200, 201]:
         print("Record successfully sent to the server.")
         return response.json()
     else:

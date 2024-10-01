@@ -163,12 +163,12 @@ def push_to_server(result_folder, config, log_message):
 
     # POST the result.json to the API
     url = url = config['webservice_url'] +'/catphanresults'
-    res = webservice_helper.post_catphanresult(catphanresult=result_data, url=url)
+    res = webservice_helper.post(obj=result_data, url=url)
 
     if res != None:
         # Assuming the API returns the created document with the _id field
         if '_id' in res:
-            catphanresult_document_id = res['_id']
+            document_id = res['_id']
     else:
         raise Exception('Failed posting catphan result!')
 

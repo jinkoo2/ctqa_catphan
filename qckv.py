@@ -25,29 +25,31 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
 
     # Catphan analysis logic
     log_message('Running analysis...')
-    qckv = StandardImagingQCkV(input_file)
+    phantom = StandardImagingQCkV(input_file)
     params = config['analysis_params']
-    qckv.analyze(low_contrast_threshold=params['low_contrast_threshold'],
+    
+    phantom.analyze(low_contrast_threshold=params['low_contrast_threshold'],
                 high_contrast_threshold=params['high_contrast_threshold'],
-                invert=params['invert'],
-                angle_override=False,
-                center_override=False,
-                size_override=False,
+                #invert=False,
+                #angle_override=False,
+                #center_override=False,
+                #size_override=False,
                 ssd=params['ssd'],
                 low_contrast_method=params['low_contrast_method'],
                 visibility_threshold=params['visibility_threshold'],
-                x_adjustment=params['x_adjustment'],
-                y_adjustment=params['y_adjustment'],
-                angle_adjustment=params['angle_adjustment'],
-                roi_size_factor=params['roi_size_factor'],
-                scaling_factor=params['scaling_factor'])
-    
+                #x_adjustment=params['x_adjustment'],
+                #y_adjustment=params['y_adjustment'],
+                #angle_adjustment=params['angle_adjustment'],
+                #roi_size_factor=params['roi_size_factor'],
+                #scaling_factor=params['scaling_factor']
+    )
+
     # print results
-    log_message(qckv.results())
+    log_message(phantom.results())
 
     file = os.path.join(output_dir, 'analyzed_image.png')
     log_message(f'saving image: {file}')
-    qckv.save_analyzed_image(filename=file)
+    phantom.save_analyzed_image(filename=file)
 
     # copy logo file
     logo_file = config['publish_pdf_params']['logo']
@@ -60,11 +62,11 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
         log_message('logo_file not found. using default logo image.')
     
     # Save the results as PDF, TXT, and JSON
-    result_pdf = os.path.join(output_dir, config['publish_pdf_params']['filename'])
+    result_pdf = os.path.join(output_dir, 'result.pdf')
     log_message(f'Saving result PDF: {result_pdf}')
     params = config['publish_pdf_params']
 
-    qckv.publish_pdf(
+    phantom.publish_pdf(
         filename=result_pdf,
         notes=notes,
         open_file=True,
@@ -75,9 +77,9 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
     result_txt = os.path.join(output_dir, 'result.txt')
     log_message(f'Saving result TXT: {result_txt}')
     with open(result_txt, 'w') as file:
-        file.write(ct.results())
+        file.write(phantom.results())
     
-    result = ct.results_data()
+    result = phantom.results_data()
     result_json = os.path.join(output_dir, 'result.json')
 
     result_dict = json.loads(json.dumps(vars(result), default=obj_serializer))
@@ -102,7 +104,7 @@ def push_to_server(result_folder, config, log_message):
     
     # Zip the input folder
     log_message(f"Zipping input folder: {result_folder}")
-    zip_filepath = util.zip_folder(result_folder, f'catphan_', temp_folder)
+    zip_filepath = util.zip_folder(result_folder, f'analysis_', temp_folder)
     log_message(f"Result folder zipped at: {zip_filepath}")
     
     # Get the upload URL from config
@@ -135,13 +137,13 @@ def push_to_server(result_folder, config, log_message):
     result_data['file'] = uploaded_zip_filename
 
     # POST the result.json to the API
-    url = url = config['webservice_url'] +'/catphanresults'
-    res = webservice_helper.post_catphanresult(catphanresult=result_data, url=url)
+    url = url = config['webservice_url'] +'/qckvresults'
+    res = webservice_helper.post(obj=result_data, url=url)
 
     if res != None:
         # Assuming the API returns the created document with the _id field
         if '_id' in res:
-            catphanresult_document_id = res['_id']
+            document_id = res['_id']
     else:
         raise Exception('Failed posting catphan result!')
 

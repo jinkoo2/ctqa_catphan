@@ -104,7 +104,7 @@ def push_to_server(result_folder, config, log_message):
     
     # Zip the input folder
     log_message(f"Zipping input folder: {result_folder}")
-    zip_filepath = util.zip_folder(result_folder, f'catphan_', temp_folder)
+    zip_filepath = util.zip_folder(result_folder, f'analysis_', temp_folder)
     log_message(f"Result folder zipped at: {zip_filepath}")
     
     # Get the upload URL from config
@@ -137,13 +137,13 @@ def push_to_server(result_folder, config, log_message):
     result_data['file'] = uploaded_zip_filename
 
     # POST the result.json to the API
-    url = url = config['webservice_url'] +'/catphanresults'
-    res = webservice_helper.post_catphanresult(catphanresult=result_data, url=url)
+    url = url = config['webservice_url'] +'/qc3results'
+    res = webservice_helper.post(obj=result_data, url=url)
 
     if res != None:
         # Assuming the API returns the created document with the _id field
         if '_id' in res:
-            catphanresult_document_id = res['_id']
+            document_id = res['_id']
     else:
         raise Exception('Failed posting catphan result!')
 

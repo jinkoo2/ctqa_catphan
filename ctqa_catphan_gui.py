@@ -337,8 +337,7 @@ class CTQAGuiApp:
 
             import shutil
             src_file = selected_file
-            filename = os.path.basename(src_file)
-            dst_file = os.path.join(qckv_dir, filename)
+            dst_file = os.path.join(qckv_dir, 'input.dcm')
             shutil.copy(src_file, dst_file)
             
             self.analysis_input_file = dst_file
@@ -403,8 +402,7 @@ class CTQAGuiApp:
 
             import shutil
             src_file = selected_file
-            filename = os.path.basename(src_file)
-            dst_file = os.path.join(qc3_dir, filename)
+            dst_file = os.path.join(qc3_dir, 'input.dcm')
             shutil.copy(src_file, dst_file)
             
             self.analysis_input_file = dst_file
@@ -544,7 +542,7 @@ class CTQAGuiApp:
                                                                 app=app)
 
         self.log_message(f'posting the measurement1d array to the server... url={url}')
-        res = webservice_helper.post_measurements(measurements, url=url)
+        res = webservice_helper.post(measurements, url=url)
         if res != None:
             self.log_message("post succeeded!")
             return res
@@ -553,29 +551,36 @@ class CTQAGuiApp:
             return None
 
     def record_result_thread(self):
-        
         if not hasattr(self, 'analysis_result_folder') or not os.path.exists(self.analysis_result_folder):
             self.log_message('Result folder not present. Please run your analysis first')
-
-        # Disable the "Run Analysis" button to prevent multiple clicks
-        self.push_to_server_button.config(state=tk.DISABLED)
-        
-        # Show progress
-        self.progress_label.config(text="Pushing data to server...")
-        self.progress_bar.start()
+            return
 
         # Run analysis in a separate thread
         threading.Thread(target=self.record_result).start()
 
     def record_result(self):
+        
+        # Disable the "Run Analysis" button to prevent multiple clicks
+        # self.push_to_server_button.config(state=tk.DISABLED)
+        
+        # Show progress
+        self.progress_label.config(text="Pushing data to server...")
+        self.progress_bar.start()
 
         try:
-            
             if self.phantom().lower() in ['catphan604', 'catphan504']:    
                 import catphan
-
                 result_data = catphan.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
-
+                # post result as measurements   
+                self.record_result_as_measurement1ds(result_data)
+            elif self.phantom().lower() == 'qc3':
+                import qc3
+                result_data = qc3.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
+                # post result as measurements   
+                self.record_result_as_measurement1ds(result_data)
+            elif self.phantom().lower() == 'qckv':
+                import qckv
+                result_data = qckv.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
                 # post result as measurements   
                 self.record_result_as_measurement1ds(result_data)
             else:
