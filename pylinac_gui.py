@@ -23,7 +23,7 @@ def show_splash_screen():
     splash = tk.Tk()
     splash.overrideredirect(True)  # Hide window borders and controls
     splash.geometry("300x200+500+300")  # Set the position and size of the splash screen
-    splash_label = tk.Label(splash, text="Loading CT QA App...", font=("Helvetica", 16))
+    splash_label = tk.Label(splash, text="Loading...", font=("Helvetica", 16))
     splash_label.pack(expand=True)
     splash.update()
     time.sleep(2)  # Simulate some loading time (2 seconds)
@@ -37,10 +37,10 @@ def find_obj_of_id(objs, id):
 def get_obj_id_list(objs):
     return [obj["id"] for obj in objs]
                   
-class CTQAGuiApp:
+class PyLinacGuiApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("CTQA-CatPhans")
+        self.root.title("PyLinac GUI")
 
         # Set the application icon (ensure app.ico is in the same directory as this script)
         self.root.iconbitmap('app.ico')
@@ -127,18 +127,26 @@ class CTQAGuiApp:
         self.notes_frame.pack(pady=5, padx=5, fill="x")
 
         self.notes_label = tk.Label(self.notes_frame, text="Notes:")
-        self.notes_label.pack(side="top", anchor="w")
+        self.notes_label.pack(side="left", padx=5)
 
-        self.notes_text = tk.Text(self.notes_frame, height=3, wrap="word")
-        self.notes_text.pack(fill="x", padx=5, pady=5)
+        self.notes_text = tk.Text(self.notes_frame, height=1, wrap="word")
+        self.notes_text.pack(side=tk.LEFT, fill="x", padx=5, pady=5)
+
+        # Buttons Section
+        self.buttons_frame = tk.Frame(root)
+        self.buttons_frame.pack(pady=5, padx=5, fill="x")
+
+        # Create "Select Dicom Image" button
+        self.select_dicom_image_button = tk.Button(self.buttons_frame, text="Select Image", command=self.select_dicom_image)
+        self.select_dicom_image_button.pack(side=tk.LEFT, padx=5, pady=10)
 
         # Create "Run Analysis" button
-        self.run_button = tk.Button(root, text="Run Analysis", command=self.run_analysis_thread)
-        self.run_button.pack(pady=10)
+        self.run_button = tk.Button(self.buttons_frame, text="Run Analysis", command=self.run_analysis_thread)
+        self.run_button.pack(side=tk.LEFT, padx=5, pady=10)
 
         # Create "Record" button
-        self.push_to_server_button = tk.Button(root, text="Push to server", command=self.record_result_thread)
-        self.push_to_server_button.pack(pady=10)
+        self.push_to_server_button = tk.Button(self.buttons_frame, text="Push to server", command=self.record_result_thread)
+        self.push_to_server_button.pack(side=tk.LEFT, padx=5, pady=10)
        
         # Create a frame to hold the Text widget and the Scrollbar for log output
         self.log_frame = tk.Frame(root)
@@ -155,11 +163,23 @@ class CTQAGuiApp:
         # Configure the Scrollbar to work with the Text widget
         self.scrollbar.config(command=self.log_output.yview)
 
+        # Create a frame to hold the status bar components
+        self.status_frame = tk.Frame(root, relief=tk.SUNKEN, bd=1)
+        self.status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # Create a label for the status message
+        #self.progress_label = tk.Label(self.status_frame, text="Ready", anchor=tk.W)
+        #self.progress_label.pack(side=tk.LEFT, padx=5)
+
+        # Create a progress bar
+        self.progress_bar = ttk.Progressbar(self.status_frame, orient=tk.HORIZONTAL, mode='indeterminate')
+        self.progress_bar.pack(side=tk.BOTTOM, fill= 'x', padx=5, pady=5)
+
         # Progress bar and status label at the bottom of the window
-        self.progress_label = tk.Label(root, text="")
-        self.progress_label.pack(side="bottom", pady=5)
-        self.progress_bar = ttk.Progressbar(root, mode="indeterminate")
-        self.progress_bar.pack(side="bottom", fill="x", padx=5, pady=5)
+        #self.progress_label = tk.Label(root, text="")
+        #self.progress_label.pack(side="bottom", pady=5)
+        #self.progress_bar = ttk.Progressbar(root, mode="indeterminate")
+        #self.progress_bar.pack(side="bottom", fill="x", padx=5, pady=5)
 
         # Set up the exit event to save settings
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -265,63 +285,12 @@ class CTQAGuiApp:
         self.log_output.insert(tk.END, message + "\n")
         self.log_output.see(tk.END)
 
-    def run_analysis_thread(self):
+    def select_dicom_image_2d(self):
         
-        # Disable the "Run Analysis" button to prevent multiple clicks
-        # self.run_button.config(state=tk.DISABLED)
-        
-        # Show progress
-        self.progress_label.config(text="Running analysis...")
-        self.progress_bar.start()
-
-        # Run analysis in a separate thread
-        threading.Thread(target=self.run_analysis).start()
-
-    def run_analysis(self):
-        
-        try:
-            if self.phantom().lower() in ['catphan604', 'catphan504']:
-                self.run_analysis_catphan()  
-            elif self.phantom().lower() == 'qckv':
-                self.run_analysis_qckv()
-            elif self.phantom().lower() == 'qc3':
-                self.run_analysis_qc3()
-            elif self.phantom().lower() == 'fc2':
-                self.run_analysis_fc2()
-            else:
-                pass
-        except Exception as e:
-            self.log_message(f"Error: {str(e)}")
-        finally:
-            # Re-enable the button and stop progress indicator
-            self.run_button.config(state=tk.NORMAL)
-            self.progress_bar.stop()
-
-    
-    def run_analysis_qckv(self):
-        import qckv
-
-        self.phantom_config = self.load_phantom_config()
-
-        input_dir = self.input_folder_path.cget("text")
-        output_dir = self.output_folder_path.cget("text")
-
-        if not input_dir:
-            messagebox.showerror("Error", "Please select the input folder and config file.")
-            return
-
-        if not output_dir:
-            output_dir = os.path.join(input_dir, 'out')
-
-        if self.phantom().lower().strip() in ['catphan604', 'catphan504']:
-            selection_mode = SelectionMode.SERIES
-        else:
-            selection_mode = SelectionMode.FILE
-        
+        input_dir = self.get_input_folder()
+        selection_mode = SelectionMode.FILE
         dicom_chooser = DicomChooser(self.root, input_dir, selection_mode=selection_mode)
         dicom_chooser.show()
-
-        # Use wait_window to pause execution until the selection window is closed
         self.root.wait_window(dicom_chooser.window)
 
         # Get the selection
@@ -341,8 +310,80 @@ class CTQAGuiApp:
             self.analysis_result_folder = case_outdir
         else:
             self.log_message("No files selected for analysis.")
+
+    def select_dicom_image_3d(self):
+        input_dir =  self.get_input_folder()
+
+        if self.phantom().lower().strip().startswith('catphan'):
+            selection_mode = SelectionMode.SERIES
+        else:
+            selection_mode = SelectionMode.FILE
+        
+        dicom_chooser = DicomChooser(self.root, input_dir, selection_mode=selection_mode)
+        dicom_chooser.show()
+        self.root.wait_window(dicom_chooser.window)
+        selected_series_name, selected_files = dicom_chooser.get_selection()
+        self.log_message(f"Selected image: {selected_series_name}")
+
+        if selected_files and len(selected_files)>1:
+            
+            # case output folder
+            case_outdir = self.get_case_output_folder(selected_files[0])
+            self.log_message(f'case output folder={case_outdir}')
+
+            import shutil
+            for i, src_file in enumerate(selected_files):
+                dst_file = os.path.join(case_outdir, f'input_{str(i).zfill(3)}.dcm' )
+                self.log_message(f'copying file...{src_file}-->{dst_file}')
+                shutil.copy(src_file, dst_file)
+            
+            self.analysis_input_folder = case_outdir
+            self.analysis_result_folder = case_outdir
+        else:
+            self.log_message("No image selected.")
             return
 
+    def select_dicom_image(self):
+        if self.phantom().lower().strip().startswith('catphan'):
+            self.select_dicom_image_3d()
+        else:
+            self.select_dicom_image_2d()
+
+    def run_analysis_thread(self):
+        
+        # Disable the "Run Analysis" button to prevent multiple clicks
+        # self.run_button.config(state=tk.DISABLED)
+        
+        # Show progress
+        #self.progress_label.config(text="Running analysis...")
+        self.progress_bar.start()
+
+        # Run analysis in a separate thread
+        threading.Thread(target=self.run_analysis).start()
+
+    def run_analysis(self):
+        try:
+            if self.phantom().lower().startswith('catphan'):
+                self.run_analysis_catphan()  
+            elif self.phantom().lower() == 'qckv':
+                self.run_analysis_qckv()
+            elif self.phantom().lower() == 'qc3':
+                self.run_analysis_qc3()
+            elif self.phantom().lower() == 'fc2':
+                self.run_analysis_fc2()
+            else:
+                pass
+        except Exception as e:
+            self.log_message(f"Error: {str(e)}")
+        finally:
+            # Re-enable the button and stop progress indicator
+            self.run_button.config(state=tk.NORMAL)
+            self.progress_bar.stop()
+    
+    def run_analysis_qckv(self):
+        import qckv
+
+        self.phantom_config = self.load_phantom_config()
 
         metadata=self.phantom_config['publish_pdf_params']['metadata']
         metadata['Performed By'] = self.performed_by_combobox.get()
@@ -366,47 +407,6 @@ class CTQAGuiApp:
 
         self.phantom_config = self.load_phantom_config()
 
-        input_dir = self.input_folder_path.cget("text")
-        output_dir = self.output_folder_path.cget("text")
-
-        if not input_dir:
-            messagebox.showerror("Error", "Please select the input folder and config file.")
-            return
-
-        if not output_dir:
-            output_dir = os.path.join(input_dir, 'out')
-
-        if self.phantom().lower().strip() in ['catphan604', 'catphan504']:
-            selection_mode = SelectionMode.SERIES
-        else:
-            selection_mode = SelectionMode.FILE
-        
-        dicom_chooser = DicomChooser(self.root, input_dir, selection_mode=selection_mode)
-        dicom_chooser.show()
-
-        # Use wait_window to pause execution until the selection window is closed
-        self.root.wait_window(dicom_chooser.window)
-
-        # Get the selection
-        selected_file = dicom_chooser.selected_file
-        self.log_message(f'selected_file={selected_file}')
-
-        if selected_file:
-            # case output folder
-            case_outdir = self.get_case_output_folder(selected_file)
-
-            import shutil
-            src_file = selected_file
-            dst_file = os.path.join(case_outdir, 'input.dcm')
-            shutil.copy(src_file, dst_file)
-            
-            self.analysis_input_file = dst_file
-            self.analysis_result_folder = case_outdir
-        else:
-            self.log_message("No files selected for analysis.")
-            return
-
-
         metadata=self.phantom_config['publish_pdf_params']['metadata']
         metadata['Performed By'] = self.performed_by_combobox.get()
         metadata['Performed Date'] = self.performed_date_entry.get() 
@@ -427,46 +427,6 @@ class CTQAGuiApp:
         import fc2
 
         self.phantom_config = self.load_phantom_config()
-
-        input_dir = self.input_folder_path.cget("text")
-        output_dir = self.output_folder_path.cget("text")
-
-        if not input_dir:
-            messagebox.showerror("Error", "Please select the input folder and config file.")
-            return
-
-        if not output_dir:
-            output_dir = os.path.join(input_dir, 'out')
-
-        if self.phantom().lower().strip() in ['catphan604', 'catphan504']:
-            selection_mode = SelectionMode.SERIES
-        else:
-            selection_mode = SelectionMode.FILE
-        
-        dicom_chooser = DicomChooser(self.root, input_dir, selection_mode=selection_mode)
-        dicom_chooser.show()
-
-        # Use wait_window to pause execution until the selection window is closed
-        self.root.wait_window(dicom_chooser.window)
-
-        # Get the selection
-        selected_file = dicom_chooser.selected_file
-        self.log_message(f'selected_file={selected_file}')
-
-        if selected_file:
-            # case output folder
-            case_outdir = self.get_case_output_folder(selected_file)
-
-            import shutil
-            src_file = selected_file
-            dst_file = os.path.join(case_outdir, 'input.dcm')
-            shutil.copy(src_file, dst_file)
-            
-            self.analysis_input_file = dst_file
-            self.analysis_result_folder = case_outdir
-        else:
-            self.log_message("No files selected for analysis.")
-            return
 
         metadata=self.phantom_config['publish_pdf_params']['metadata']
         metadata['Performed By'] = self.performed_by_combobox.get()
@@ -536,47 +496,6 @@ class CTQAGuiApp:
 
         self.phantom_config = self.load_phantom_config()
 
-        input_dir =  self.get_input_folder()
-        output_dir = self.get_output_folder()
-
-        if self.phantom().lower().strip() in ['catphan604', 'catphan504']:
-            selection_mode = SelectionMode.SERIES
-        else:
-            selection_mode = SelectionMode.FILE
-        
-        dicom_chooser = DicomChooser(self.root, input_dir, selection_mode=selection_mode)
-        dicom_chooser.show()
-
-        # Use wait_window to pause execution until the selection window is closed
-        self.root.wait_window(dicom_chooser.window)
-
-        # Get the selection
-        selected_series_name, selected_files = dicom_chooser.get_selection()
-
-        if selected_files and len(selected_files)>1:
-            self.log_message(f"Running analysis on series: {selected_series_name}")
-            
-            # case output folder
-            case_outdir = self.get_case_output_folder(selected_files[0])
-
-            self.log_message(f'case output folder={case_outdir}')
-            if not os.path.exists(case_outdir):
-                os.makedirs(case_outdir)
-
-            import shutil
-            for i, src_file in enumerate(selected_files):
-                src_filename = os.path.basename(src_file)
-                dst_filename = f'input_{str(i).zfill(3)}.dcm'
-                dst_file = os.path.join(case_outdir, dst_filename )
-                self.log_message(f'copying file...{src_file}-->{dst_file}')
-                shutil.copy(src_file, dst_file)
-            
-            self.analysis_input_folder = case_outdir
-            self.analysis_result_folder = case_outdir
-        else:
-            self.log_message("No files selected for analysis.")
-            return
-
         metadata=self.phantom_config['publish_pdf_params']['metadata']
         metadata['Performed By'] = self.performed_by_combobox.get()
         metadata['Performed Date'] = self.performed_date_entry.get() 
@@ -640,10 +559,10 @@ class CTQAGuiApp:
         self.log_message(f'posting the measurement1d array to the server... url={url}')
         res = webservice_helper.post(measurements, url=url)
         if res != None:
-            self.log_message("post succeeded!")
+            self.log_message("Post succeeded!")
             return res
         else:
-            self.log_message("post failed!")
+            self.log_message("Post failed!")
             return None
 
     def record_result_thread(self):
@@ -660,11 +579,11 @@ class CTQAGuiApp:
         # self.push_to_server_button.config(state=tk.DISABLED)
         
         # Show progress
-        self.progress_label.config(text="Pushing data to server...")
+        #self.progress_label.config(text="Pushing data to server...")
         self.progress_bar.start()
 
         try:
-            if self.phantom().lower() in ['catphan604', 'catphan504']:    
+            if self.phantom().lower().startswith('catphan'):    
                 import catphan
                 result_data = catphan.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
                 # post result as measurements   
@@ -694,7 +613,7 @@ class CTQAGuiApp:
         finally:
             # Re-enable the button and stop progress indicator
             self.push_to_server_button.config(state=tk.NORMAL)
-            self.progress_label.config(text="Pushing to the server completed!")
+            #self.progress_label.config(text="Pushing to the server completed!")
             self.progress_bar.stop()
 
 # Main Application
@@ -704,5 +623,5 @@ if __name__ == "__main__":
 
     # Start the main application after splash
     root = tk.Tk()
-    app = CTQAGuiApp(root)
+    app = PyLinacGuiApp(root)
     root.mainloop()
