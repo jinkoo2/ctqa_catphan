@@ -16,6 +16,17 @@ def get_app_name():
 
     return exe_name
 
+def get_cwd():
+    if getattr(sys, 'frozen', False):
+        # If running as a compiled executable
+        current_folder = os.path.dirname(sys.executable)
+    else:
+        # If running as a script
+        current_folder = os.path.dirname(os.path.abspath(__file__))
+    
+    return current_folder
+
+
 # convert to dict
 # Using vars() will fail if there are complex types, so we'll handle that
 def obj_serializer(obj):

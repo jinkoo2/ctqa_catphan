@@ -53,6 +53,11 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
 
     # copy logo file
     logo_file = config['publish_pdf_params']['logo']
+    if not os.path.exists(logo_file):
+        # check the current folder
+        cwd = util.get_cwd()
+        log_file = os.path.join(cwd, log_file)
+
     if os.path.exists(logo_file):
         log_filename = os.path.basename(logo_file)
         dst = os.path.join(output_dir, log_filename)

@@ -44,6 +44,36 @@
         {
             "id": "FC2",
             "name": "Standard Imaging FC-2 (MV)"
+        },
+        {
+            "id": "LeedsTOR",
+            "name": "Leeds TOR (kV)"
+        }
+        ,
+        {
+            "id": "LasVegas",
+            "name": "Las Vegas (MV)"
+        }
+    ],
+    "imaging_modality": [
+        {
+            "id": "kVCBCT"
+        },
+        {
+            "id": "mVCBCT"
+        },
+        {
+            "id": "kV"
+        },
+        {
+            "id": "MV"
+        },
+        {
+            "id": "FilmColor"
+        }
+        ,
+        {
+            "id": "FilmMono"
         }
     ],
     "users": [

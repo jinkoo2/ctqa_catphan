@@ -1,8 +1,8 @@
 {
-    "input_folder": "D:/Temp/image qa/kv",
+    "input_folder": "D:/Temp/pfcc-qa",
     "output_folder": "D:/Temp",
-    "performed_by": "Yizhou.Zhao@stonybrookmedicine.edu",
-    "site": "SBUH",
-    "device": "Truebeam",
-    "phantom": "QCkV"
+    "performed_by": "jinkoo.kim@stonybrookmedicine.edu",
+    "site": "PFCC",
+    "device": "TruebeamSH",
+    "phantom": "LasVegas"
 }

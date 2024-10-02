@@ -13,6 +13,7 @@ import util
 import model_helper
 import webservice_helper
 import dicom_helper
+import importlib
 
 from dicom_chooser import DicomChooser, SelectionMode
 
@@ -206,7 +207,7 @@ class PyLinacGuiApp:
 
         site = find_obj_of_id(sites, selected_value)        
         if site == None:
-            self.log_message("site not found in the configuration file.")
+            self.log("site not found in the configuration file.")
             return 
         
         devices = site["devices"]
@@ -281,7 +282,7 @@ class PyLinacGuiApp:
         if folder:
             self.output_folder_path.config(text=folder)
 
-    def log_message(self, message):
+    def log(self, message):
         self.log_output.insert(tk.END, message + "\n")
         self.log_output.see(tk.END)
 
@@ -295,7 +296,7 @@ class PyLinacGuiApp:
 
         # Get the selection
         selected_file = dicom_chooser.selected_file
-        self.log_message(f'selected_file={selected_file}')
+        self.log(f'selected_file={selected_file}')
 
         if selected_file:
             # case output folder
@@ -309,7 +310,7 @@ class PyLinacGuiApp:
             self.analysis_input_file = dst_file
             self.analysis_result_folder = case_outdir
         else:
-            self.log_message("No files selected for analysis.")
+            self.log("No files selected for analysis.")
 
     def select_dicom_image_3d(self):
         input_dir =  self.get_input_folder()
@@ -323,24 +324,24 @@ class PyLinacGuiApp:
         dicom_chooser.show()
         self.root.wait_window(dicom_chooser.window)
         selected_series_name, selected_files = dicom_chooser.get_selection()
-        self.log_message(f"Selected image: {selected_series_name}")
+        self.log(f"Selected image: {selected_series_name}")
 
         if selected_files and len(selected_files)>1:
             
             # case output folder
             case_outdir = self.get_case_output_folder(selected_files[0])
-            self.log_message(f'case output folder={case_outdir}')
+            self.log(f'case output folder={case_outdir}')
 
             import shutil
             for i, src_file in enumerate(selected_files):
                 dst_file = os.path.join(case_outdir, f'input_{str(i).zfill(3)}.dcm' )
-                self.log_message(f'copying file...{src_file}-->{dst_file}')
+                self.log(f'copying file...{src_file}-->{dst_file}')
                 shutil.copy(src_file, dst_file)
             
             self.analysis_input_folder = case_outdir
             self.analysis_result_folder = case_outdir
         else:
-            self.log_message("No image selected.")
+            self.log("No image selected.")
             return
 
     def select_dicom_image(self):
@@ -365,24 +366,19 @@ class PyLinacGuiApp:
         try:
             if self.phantom().lower().startswith('catphan'):
                 self.run_analysis_catphan()  
-            elif self.phantom().lower() == 'qckv':
-                self.run_analysis_qckv()
-            elif self.phantom().lower() == 'qc3':
-                self.run_analysis_qc3()
-            elif self.phantom().lower() == 'fc2':
-                self.run_analysis_fc2()
             else:
-                pass
+                self.run_analysis_2d(self.phantom())
         except Exception as e:
-            self.log_message(f"Error: {str(e)}")
+            self.log(f"Error: {str(e)}")
         finally:
             # Re-enable the button and stop progress indicator
             self.run_button.config(state=tk.NORMAL)
             self.progress_bar.stop()
     
-    def run_analysis_qckv(self):
-        import qckv
-
+    def run_analysis_2d(self, phantom_id):
+        module_name = phantom_id.lower()
+        self.log(f'Loading module...{module_name}')
+        module = importlib.import_module(module_name)
         self.phantom_config = self.load_phantom_config()
 
         metadata=self.phantom_config['publish_pdf_params']['metadata']
@@ -391,59 +387,23 @@ class PyLinacGuiApp:
 
         notes = self.notes_text.get("1.0", tk.END).strip()
 
-
-        qckv.run_analysis(device_id=self.device_id(),
+        module.run_analysis(device_id=self.device_id(),
             input_file=self.analysis_input_file, 
             output_dir=self.analysis_result_folder, 
             config = self.phantom_config, 
             notes=notes, 
             metadata=metadata, 
-            log_message=self.log_message
+            log_message=self.log
             )
 
-
-    def run_analysis_qc3(self):
-        import qc3
-
-        self.phantom_config = self.load_phantom_config()
-
-        metadata=self.phantom_config['publish_pdf_params']['metadata']
-        metadata['Performed By'] = self.performed_by_combobox.get()
-        metadata['Performed Date'] = self.performed_date_entry.get() 
-
-        notes = self.notes_text.get("1.0", tk.END).strip()
-
-        qc3.run_analysis(device_id=self.device_id(),
-            input_file=self.analysis_input_file, 
-            output_dir=self.analysis_result_folder, 
-            config = self.phantom_config, 
-            notes=notes, 
-            metadata=metadata, 
-            log_message=self.log_message
-            )
+    
 
 
-    def run_analysis_fc2(self):
-        import fc2
-
-        self.phantom_config = self.load_phantom_config()
-
-        metadata=self.phantom_config['publish_pdf_params']['metadata']
-        metadata['Performed By'] = self.performed_by_combobox.get()
-        metadata['Performed Date'] = self.performed_date_entry.get() 
-
-        notes = self.notes_text.get("1.0", tk.END).strip()
-
-        fc2.run_analysis(device_id=self.device_id(),
-            input_file=self.analysis_input_file, 
-            output_dir=self.analysis_result_folder, 
-            config = self.phantom_config, 
-            notes=notes, 
-            metadata=metadata, 
-            log_message=self.log_message
-            )
+    
 
 
+    
+        
     def get_input_folder(self):
 
         intput_folder = self.input_folder_path.cget("text")
@@ -459,7 +419,7 @@ class PyLinacGuiApp:
             raise Exception("Please select an output folder")
 
         if not os.path.exists(output_folder):
-            self.log_message(f'output_folder not found. createing a folder: {output_folder}')
+            self.log(f'output_folder not found. createing a folder: {output_folder}')
             os.makedirs(output_folder)
         
         return output_folder
@@ -473,7 +433,7 @@ class PyLinacGuiApp:
         folder = os.path.join(self.get_output_folder(), dirname)
 
         if not os.path.exists(folder):
-            self.log_message(f'folder not found. createing a folder: {folder}')
+            self.log(f'folder not found. createing a folder: {folder}')
             os.makedirs(folder)
         
         return folder
@@ -486,7 +446,7 @@ class PyLinacGuiApp:
         folder = os.path.join(self.get_phantom_folder(), acq_dt_str)
 
         if not os.path.exists(folder):
-            self.log_message(f'folder not found. createing a folder: {folder}')
+            self.log(f'folder not found. createing a folder: {folder}')
             os.makedirs(folder)
         
         return folder
@@ -508,7 +468,7 @@ class PyLinacGuiApp:
             config = self.phantom_config, 
             notes=notes, 
             metadata=metadata, 
-            log_message=self.log_message
+            log_message=self.log
             )
 
     def save_settings(self):
@@ -546,32 +506,33 @@ class PyLinacGuiApp:
         device_id = self.device()
 
         # travese the result object and collect numbers
-        self.log_message('collecting numbers from the result file...')
+        self.log('collecting numbers from the result file...')
         kvps = obj_helper.traverse_and_collect_numbers(result_data)
 
         # convert the numbers key value pairs to measurement objects
-        self.log_message('converting numbers kvps to measurement1d objects...')
+        self.log('converting numbers kvps to measurement1d objects...')
         measurements = model_helper.convert_kvps_to_measurement1d(key_value_pairs=kvps, 
                                                                 key_prefix=f'{self.phantom().lower()}_',
                                                                 device_id=f'{site_id}|{device_id}', 
                                                                 app=app)
 
-        self.log_message(f'posting the measurement1d array to the server... url={url}')
+        self.log(f'posting the measurement1d array to the server... url={url}')
         res = webservice_helper.post(measurements, url=url)
         if res != None:
-            self.log_message("Post succeeded!")
+            self.log("Post succeeded!")
             return res
         else:
-            self.log_message("Post failed!")
+            self.log("Post failed!")
             return None
 
     def record_result_thread(self):
         if not hasattr(self, 'analysis_result_folder') or not os.path.exists(self.analysis_result_folder):
-            self.log_message('Result folder not present. Please run your analysis first')
+            self.log('Result folder not present. Please run your analysis first')
             return
 
         # Run analysis in a separate thread
         threading.Thread(target=self.record_result).start()
+
 
     def record_result(self):
         
@@ -583,31 +544,16 @@ class PyLinacGuiApp:
         self.progress_bar.start()
 
         try:
-            if self.phantom().lower().startswith('catphan'):    
-                import catphan
-                result_data = catphan.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
-                # post result as measurements   
-                self.record_result_as_measurement1ds(result_data)
-            elif self.phantom().lower() == 'qc3':
-                import qc3
-                result_data = qc3.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
-                # post result as measurements   
-                self.record_result_as_measurement1ds(result_data)
-            elif self.phantom().lower() == 'qckv':
-                import qckv
-                result_data = qckv.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
-                # post result as measurements   
-                self.record_result_as_measurement1ds(result_data)
-            elif self.phantom().lower() == 'fc2':
-                import fc2
-                result_data = fc2.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log_message)
-                # post result as measurements   
-                self.record_result_as_measurement1ds(result_data)
-            else:
-                self.log_message(f'Error: unknown phantom: {self.phantom()}')
+            module_name = 'catphan' if self.phantom().lower().startswith('catphan') else self.phantom().lower()
+            self.log(f'Loading module...{module_name}')
+            phantom_module = importlib.import_module(module_name)
+
+            result_data = phantom_module.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log)
+                
+            self.record_result_as_measurement1ds(result_data)
 
         except Exception as e:
-            self.log_message(f"Error: {str(e)}")
+            self.log(f"Error: {str(e)}")
             self.progress_bar.stop()
 
         finally:
