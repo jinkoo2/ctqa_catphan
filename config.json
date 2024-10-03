@@ -25,34 +25,35 @@
     ],
     "phantoms": [
         {
-            "id": "CatPhan504",
-            "name": "CatPhan504"
+            "id": "CatPhan",
+            "name": "CatPhan",
+            "dim" : 3
         },
         {
-            "id": "CatPhan604",
-            "name": "CatPhan604"
-        }
-        ,
-        {
             "id": "QCkV",
-            "name": "Standard Imaging QC-kV"
+            "name": "Standard Imaging QC-kV",
+            "dim" : 2
         },
         {
             "id": "QC3",
-            "name": "Standard Imaging QC-3 (MV)"
+            "name": "Standard Imaging QC-3 (MV)",
+            "dim" : 2
         },
         {
             "id": "FC2",
-            "name": "Standard Imaging FC-2 (MV)"
+            "name": "Standard Imaging FC-2 (MV)",
+            "dim" : 2
         },
         {
             "id": "LeedsTOR",
-            "name": "Leeds TOR (kV)"
+            "name": "Leeds TOR (kV)",
+            "dim" : 2
         }
         ,
         {
             "id": "LasVegas",
-            "name": "Las Vegas (MV)"
+            "name": "Las Vegas (MV)",
+            "dim" : 2
         }
     ],
     "imaging_modality": [

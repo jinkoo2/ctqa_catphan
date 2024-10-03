@@ -312,10 +312,14 @@ class PyLinacGuiApp:
         else:
             self.log("No files selected for analysis.")
 
+    def get_phantom_dim(self):
+        phantom = find_obj_of_id(self.config['phantoms'], self.phantom())
+        return phantom['dim']
+
     def select_dicom_image_3d(self):
         input_dir =  self.get_input_folder()
 
-        if self.phantom().lower().strip().startswith('catphan'):
+        if self.get_phantom_dim() == 3:
             selection_mode = SelectionMode.SERIES
         else:
             selection_mode = SelectionMode.FILE
@@ -345,7 +349,8 @@ class PyLinacGuiApp:
             return
 
     def select_dicom_image(self):
-        if self.phantom().lower().strip().startswith('catphan'):
+        
+        if self.get_phantom_dim() == 3:
             self.select_dicom_image_3d()
         else:
             self.select_dicom_image_2d()
@@ -364,46 +369,43 @@ class PyLinacGuiApp:
 
     def run_analysis(self):
         try:
-            if self.phantom().lower().startswith('catphan'):
-                self.run_analysis_catphan()  
-            else:
-                self.run_analysis_2d(self.phantom())
+            module_name = self.phantom().lower()
+            self.log(f'Loading module...{module_name}')
+            module = importlib.import_module(module_name)
+            self.phantom_config = self.load_phantom_config()
+
+            metadata=self.phantom_config['publish_pdf_params']['metadata']
+            metadata['Performed By'] = self.performed_by_combobox.get()
+            metadata['Performed Date'] = self.performed_date_entry.get() 
+
+            notes = self.notes_text.get("1.0", tk.END).strip()
+
+            if self.get_phantom_dim() == 2:
+                module.run_analysis(device_id=self.device_id(),
+                    input_file=self.analysis_input_file, 
+                    output_dir=self.analysis_result_folder, 
+                    config = self.phantom_config, 
+                    notes=notes, 
+                    metadata=metadata, 
+                    log_message=self.log
+                    )
+            else: # 3d phantom
+                module.run_analysis(device_id=self.device_id(),
+                    input_dir = self.analysis_input_folder,
+                    output_dir=self.analysis_result_folder, 
+                    config = self.phantom_config, 
+                    notes=notes, 
+                    metadata=metadata, 
+                    log_message=self.log
+                    )
+                
+
         except Exception as e:
             self.log(f"Error: {str(e)}")
         finally:
-            # Re-enable the button and stop progress indicator
             self.run_button.config(state=tk.NORMAL)
             self.progress_bar.stop()
     
-    def run_analysis_2d(self, phantom_id):
-        module_name = phantom_id.lower()
-        self.log(f'Loading module...{module_name}')
-        module = importlib.import_module(module_name)
-        self.phantom_config = self.load_phantom_config()
-
-        metadata=self.phantom_config['publish_pdf_params']['metadata']
-        metadata['Performed By'] = self.performed_by_combobox.get()
-        metadata['Performed Date'] = self.performed_date_entry.get() 
-
-        notes = self.notes_text.get("1.0", tk.END).strip()
-
-        module.run_analysis(device_id=self.device_id(),
-            input_file=self.analysis_input_file, 
-            output_dir=self.analysis_result_folder, 
-            config = self.phantom_config, 
-            notes=notes, 
-            metadata=metadata, 
-            log_message=self.log
-            )
-
-    
-
-
-    
-
-
-    
-        
     def get_input_folder(self):
 
         intput_folder = self.input_folder_path.cget("text")
@@ -451,26 +453,7 @@ class PyLinacGuiApp:
         
         return folder
 
-    def run_analysis_catphan(self):
-        import catphan
-
-        self.phantom_config = self.load_phantom_config()
-
-        metadata=self.phantom_config['publish_pdf_params']['metadata']
-        metadata['Performed By'] = self.performed_by_combobox.get()
-        metadata['Performed Date'] = self.performed_date_entry.get() 
-
-        notes = self.notes_text.get("1.0", tk.END).strip()
-
-        catphan.run_analysis(device_id=self.device_id(),
-            input_dir=self.analysis_input_folder, 
-            output_dir=self.analysis_result_folder, 
-            config = self.phantom_config, 
-            notes=notes, 
-            metadata=metadata, 
-            log_message=self.log
-            )
-
+    
     def save_settings(self):
         # Save the current selections in a dictionary
         settings = {
@@ -544,7 +527,7 @@ class PyLinacGuiApp:
         self.progress_bar.start()
 
         try:
-            module_name = 'catphan' if self.phantom().lower().startswith('catphan') else self.phantom().lower()
+            module_name = self.phantom().lower()
             self.log(f'Loading module...{module_name}')
             phantom_module = importlib.import_module(module_name)
 
