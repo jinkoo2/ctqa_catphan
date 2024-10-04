@@ -6,6 +6,7 @@ from pylinac import StandardImagingQC3
 from util import obj_serializer
 import util
 import webservice_helper
+import phantoms.helper
 
 def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log_message):
 
@@ -25,10 +26,10 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
 
     # Catphan analysis logic
     log_message('Running analysis...')
-    qc3 = StandardImagingQC3(input_file)
+    phantom = StandardImagingQC3(input_file)
     params = config['analysis_params']
     
-    qc3.analyze(low_contrast_threshold=params['low_contrast_threshold'],
+    phantom.analyze(low_contrast_threshold=params['low_contrast_threshold'],
                 high_contrast_threshold=params['high_contrast_threshold'],
                 #invert=False,
                 #angle_override=False,
@@ -45,58 +46,22 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
     )
 
     # print results
-    log_message(qc3.results())
+    log_message(phantom.results())
 
     file = os.path.join(output_dir, 'analyzed_image.png')
     log_message(f'saving image: {file}')
-    qc3.save_analyzed_image(filename=file)
+    phantom.save_analyzed_image(filename=file)
 
-    # copy logo file
-    logo_file = config['publish_pdf_params']['logo']
-    if not os.path.exists(logo_file):
-        # check the current folder
-        cwd = util.get_cwd()
-        log_file = os.path.join(cwd, log_file)
-
-    if os.path.exists(logo_file):
-        log_filename = os.path.basename(logo_file)
-        dst = os.path.join(output_dir, log_filename)
-        log_message(f'Saving logo file: {dst}')
-        shutil.copy(logo_file, dst)
-    else:
-        log_message('logo_file not found. using default logo image.')
+    phantoms.helper.copy_logo(config=config, output_dir=output_dir, log_message=log_message)
     
-    # Save the results as PDF, TXT, and JSON
-    result_pdf = os.path.join(output_dir, config['publish_pdf_params']['filename'])
-    log_message(f'Saving result PDF: {result_pdf}')
-    params = config['publish_pdf_params']
+    phantoms.helper.save_result_as_pdf(phantom=phantom, output_dir=output_dir, config=config, notes=notes, metadata=metadata, log_message=log_message)
 
-    qc3.publish_pdf(
-        filename=result_pdf,
-        notes=notes,
-        open_file=True,
-        metadata=metadata,    
-        logo=params['logo']
-    )
-
-    result_txt = os.path.join(output_dir, 'result.txt')
-    log_message(f'Saving result TXT: {result_txt}')
-    with open(result_txt, 'w') as file:
-        file.write(qc3.results())
+    phantoms.helper.save_result_as_txt(phantom=phantom, output_dir=output_dir, log_message=log_message)
     
-    result = qc3.results_data()
-    result_json = os.path.join(output_dir, 'result.json')
+    phantoms.helper.save_result_as_json(phantom=phantom, output_dir=output_dir, device_id=device_id, notes=notes, config=config, metadata=metadata, log_message=log_message)
+    
+    phantoms.helper.append_result_to_phantom_csv(phantom=phantom, output_dir=output_dir, device_id=device_id, notes=notes, metadata=metadata, log_message=log_message)
 
-    result_dict = json.loads(json.dumps(vars(result), default=obj_serializer))
-    result_dict['device_id'] = device_id
-    result_dict['performed_by'] = metadata['Performed By']
-    result_dict['performed_on'] = metadata['Performed Date']
-    result_dict['notes'] =notes 
-    result_dict['config'] = config
-
-    log_message(f'Saving result JSON: {result_json}')
-    with open(result_json, 'w') as json_file:
-        json.dump(result_dict, json_file, indent=4)
 
     log_message('Analysis completed.')
 '''

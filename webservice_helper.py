@@ -6,7 +6,7 @@ import os
 import util
 import model_helper
 import obj_helper
-
+'''
 # Post the Measurement1D array to the API
 def post_measurements(measurements, url):
     headers = {'Content-Type': 'application/json'}
@@ -21,7 +21,7 @@ def post_measurements(measurements, url):
     else:
         print(f"Failed to post measurements: {response.status_code} - {response.text}")
         return None
- 
+''' 
 def post(obj, url):
     # POST the result.json to the API
     headers = {'Content-Type': 'application/json'}
@@ -111,27 +111,47 @@ def post_analysis_result(result_folder, config, url, log_message):
 
     return result_data
 
-def post_result_as_measurement1ds(result_data, app, site_id, device_id, phantom_id, url, log):
+def post_result_as_number1ds(result_data, app, site_id, device_id, phantom_id, url, log):
     # travese the result object and collect numbers
     log('collecting numbers from the result file...')
     kvps = obj_helper.traverse_and_collect_numbers(result_data)
 
-    # convert the numbers key value pairs to measurement objects
-    log('converting numbers kvps to measurement1d objects...')
-    measurements = model_helper.convert_kvps_to_measurement1d(key_value_pairs=kvps, 
+    # convert the numbers key value pairs to number1d objects
+    log('converting numbers kvps to number1d objects...')
+    number1ds = model_helper.convert_kvps_to_number1d_or_stirng1d_list(key_value_pairs=kvps, 
                                                             key_prefix=f'{phantom_id.lower()}_',
                                                             device_id=f'{site_id}|{device_id}', 
                                                             app=app)
 
-    log(f'posting the measurement1d array to the server... url={url}')
-    res = post(measurements, url=url)
+    log(f'posting the number1d array to the server... url={url}')
+    res = post(number1ds, url=url)
     if res != None:
         log("Post succeeded!")
         return res
     else:
         log("Post failed!")
         return None
-        
+def post_result_as_string1ds(result_data, app, site_id, device_id, phantom_id, url, log):
+    # travese the result object and collect numbers
+    log('collecting strings from the result file...')
+    kvps = obj_helper.traverse_and_collect_strings(result_data)
+
+    # convert the numbers key value pairs to number1d objects
+    log('converting numbers kvps to number1d objects...')
+    string1ds = model_helper.convert_kvps_to_number1d_or_stirng1d_list(key_value_pairs=kvps, 
+                                                            key_prefix=f'{phantom_id.lower()}_',
+                                                            device_id=f'{site_id}|{device_id}', 
+                                                            app=app)
+
+    log(f'posting the number1d array to the server... url={url}')
+    res = post(string1ds, url=url)
+    if res != None:
+        log("Post succeeded!")
+        return res
+    else:
+        log("Post failed!")
+        return None
+          
 if __name__ == '__main__':
     # Example usage with a result.json object
     result_json = {

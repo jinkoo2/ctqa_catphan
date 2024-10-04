@@ -2,9 +2,10 @@ import os
 import shutil
 import json
 from pylinac import CatPhan604, CatPhan600, CatPhan504, CatPhan503
-from util import obj_serializer
+
 import util
 import webservice_helper
+import phantoms.helper 
 
 def run_analysis(device_id, input_dir, output_dir, config, notes, metadata, log_message):
 
@@ -25,20 +26,20 @@ def run_analysis(device_id, input_dir, output_dir, config, notes, metadata, log_
     log_message(f'Phantom model: {catphan_model}')
     
     if catphan_model == '604':
-        ct = CatPhan604(input_dir)
+        phantom = CatPhan604(input_dir)
     elif catphan_model == '600':
-        ct = CatPhan600(input_dir)
+        phantom = CatPhan600(input_dir)
     elif catphan_model == '504':
-        ct = CatPhan504(input_dir)
+        phantom = CatPhan504(input_dir)
     elif catphan_model == '503':
-        ct = CatPhan503(input_dir)
+        phantom = CatPhan503(input_dir)
     else:
         log_message(f'Error:Unknown CatPhan model: {catphan_model}!')
         return
     
     log_message('Running analysis...')
     params = config['analysis_params']
-    ct.analyze(
+    phantom.analyze(
         hu_tolerance=params['hu_tolerance'],
         scaling_tolerance=params['scaling_tolerance'],
         thickness_tolerance=params['thickness_tolerance'],
@@ -52,11 +53,11 @@ def run_analysis(device_id, input_dir, output_dir, config, notes, metadata, log_
     )
 
     # print results
-    log_message(ct.results())
+    log_message(phantom.results())
 
     file = os.path.join(output_dir, 'analyzed_image.png')
     log_message(f'saving image: {file}')
-    ct.save_analyzed_image(filename=file)
+    phantom.save_analyzed_image(filename=file)
     
     sub_image_header = os.path.join(output_dir, 'analyzed_subimage')
     #* ``hu`` draws the HU linearity image.
@@ -72,58 +73,19 @@ def run_analysis(device_id, input_dir, output_dir, config, notes, metadata, log_
         try:
             dst = f'{sub_image_header}.{sub}.png'
             log_message(f'saving sub image: {dst}')
-            ct.save_analyzed_subimage(filename=dst, subimage=sub)
+            phantom.save_analyzed_subimage(filename=dst, subimage=sub)
         except:
             pass
 
-    # copy logo file
-    logo_file = config['publish_pdf_params']['logo']
-    if not os.path.exists(logo_file):
-        # check the current folder
-        cwd = util.get_cwd()
-        log_file = os.path.join(cwd, log_file)
-
-    if os.path.exists(logo_file):
-        log_filename = os.path.basename(logo_file)
-        dst = os.path.join(output_dir, log_filename)
-        log_message(f'Saving logo file: {dst}')
-        shutil.copy(logo_file, dst)
-    else:
-        log_message('logo_file not found. using default logo image.')
+    phantoms.helper.copy_logo(config=config, output_dir=output_dir, log_message=log_message)
     
-    # Save the results as PDF, TXT, and JSON
-    result_pdf = os.path.join(output_dir, config['publish_pdf_params']['filename'])
-    log_message(f'Saving result PDF: {result_pdf}')
-    params = config['publish_pdf_params']
+    phantoms.helper.save_result_as_pdf(phantom=phantom, output_dir=output_dir, config=config, notes=notes, metadata=metadata, log_message=log_message)
 
-    open_file = params['open_file']
-
-    ct.publish_pdf(
-        filename=result_pdf,
-        notes=notes,
-        open_file=open_file,
-        metadata=metadata,    
-        logo=params['logo']
-    )
-
-    result_txt = os.path.join(output_dir, 'result.txt')
-    log_message(f'Saving result TXT: {result_txt}')
-    with open(result_txt, 'w') as file:
-        file.write(ct.results())
+    phantoms.helper.save_result_as_txt(phantom=phantom, output_dir=output_dir, log_message=log_message)
     
-    result = ct.results_data()
-    result_json = os.path.join(output_dir, 'result.json')
-
-    result_dict = json.loads(json.dumps(vars(result), default=obj_serializer))
-    result_dict['device_id'] = device_id
-    result_dict['performed_by'] = metadata['Performed By']
-    result_dict['performed_on'] = metadata['Performed Date']
-    result_dict['notes'] =notes 
-    result_dict['config'] = config
-
-    log_message(f'Saving result JSON: {result_json}')
-    with open(result_json, 'w') as json_file:
-        json.dump(result_dict, json_file, indent=4)
+    phantoms.helper.save_result_as_json(phantom=phantom, output_dir=output_dir, device_id=device_id, notes=notes, config=config, metadata=metadata, log_message=log_message)
+    
+    phantoms.helper.append_result_to_phantom_csv(phantom=phantom, output_dir=output_dir, device_id=device_id, notes=notes, metadata=metadata, log_message=log_message)
 
     log_message('Analysis completed.')
 

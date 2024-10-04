@@ -482,14 +482,15 @@ class PyLinacGuiApp:
         self.save_settings()
         self.root.destroy()
 
-    def record_result_as_measurement1ds(self, result_data):
+    def record_result_as_number1ds(self, result_data):
         # Configuration
-        url = self.config['webservice_url'] + '/measurement1ds'
+        url = self.config['webservice_url'] + '/number1ds'
         app = f'{util.get_app_name()} 1.0.0'
         site_id = self.site()
         device_id = self.device()
 
-        webservice_helper.post_result_as_measurement1ds(
+        self.log(f'posting result number properties to {url}...')
+        webservice_helper.post_result_as_number1ds(
             result_data=result_data,
             app=app,
             site_id=site_id,
@@ -498,7 +499,22 @@ class PyLinacGuiApp:
             url=url,
             log=self.log)
         
-        
+    def record_result_as_string1ds(self, result_data):
+        # Configuration
+        url = self.config['webservice_url'] + '/string1ds'
+        app = f'{util.get_app_name()} 1.0.0'
+        site_id = self.site()
+        device_id = self.device()
+
+        self.log(f'posting result string properties to {url}...')
+        webservice_helper.post_result_as_string1ds(
+            result_data=result_data,
+            app=app,
+            site_id=site_id,
+            device_id=device_id,
+            phantom_id=self.phantom().lower(),
+            url=url,
+            log=self.log)
 
     def record_result_thread(self):
         if not hasattr(self, 'analysis_result_folder') or not os.path.exists(self.analysis_result_folder):
@@ -529,8 +545,13 @@ class PyLinacGuiApp:
             #result_data = phantom_module.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log)
 
             url = self.config['webservice_url'] +f'/{self.phantom().lower()}results'
+            
             result_data = webservice_helper.post_analysis_result(result_folder=self.analysis_result_folder, config = self.config, url=url, log_message=self.log)   
-            self.record_result_as_measurement1ds(result_data)
+            
+
+            self.record_result_as_number1ds(result_data)
+            
+            self.record_result_as_string1ds(result_data)
 
         except Exception as e:
             self.log(f"Error: {str(e)}")
