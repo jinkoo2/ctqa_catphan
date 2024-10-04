@@ -96,10 +96,12 @@ def run_analysis(device_id, input_dir, output_dir, config, notes, metadata, log_
     log_message(f'Saving result PDF: {result_pdf}')
     params = config['publish_pdf_params']
 
+    open_file = params['open_file']
+
     ct.publish_pdf(
         filename=result_pdf,
         notes=notes,
-        open_file=True,
+        open_file=open_file,
         metadata=metadata,    
         logo=params['logo']
     )
@@ -125,6 +127,7 @@ def run_analysis(device_id, input_dir, output_dir, config, notes, metadata, log_
 
     log_message('Analysis completed.')
 
+'''
 def push_to_server(result_folder, config, log_message):
     
     temp_folder = config['temp_folder']
@@ -167,7 +170,7 @@ def push_to_server(result_folder, config, log_message):
     result_data['file'] = uploaded_zip_filename
 
     # POST the result.json to the API
-    url = url = config['webservice_url'] +'/catphanresults'
+    url = config['webservice_url'] +'/catphanresults'
     res = webservice_helper.post(obj=result_data, url=url)
 
     if res != None:
@@ -178,4 +181,4 @@ def push_to_server(result_folder, config, log_message):
         raise Exception('Failed posting catphan result!')
 
     return result_data
-
+'''

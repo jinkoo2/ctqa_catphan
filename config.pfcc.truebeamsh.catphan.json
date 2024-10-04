@@ -25,8 +25,8 @@
     "publish_pdf_params": {
         "filename": "result.pdf",
         "notes": "This is notes",
-        "open_file": true,
+        "open_file": false,
         "metadata": {},
-        "logo": "C:/Users/jkim20/Documents/ctqa_catphan/logo.jpg"
+        "logo": "logo.jpg"
     }
 }

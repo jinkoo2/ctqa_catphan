@@ -1,7 +1,7 @@
 import os
 import shutil
 import json
-from pylinac import LeedsTOR
+from pylinac import StandardImagingQCkV
 
 from util import obj_serializer
 import util
@@ -25,7 +25,7 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
 
     # Catphan analysis logic
     log_message('Running analysis...')
-    phantom = LeedsTOR(input_file)
+    phantom = StandardImagingQCkV(input_file)
     params = config['analysis_params']
     
     phantom.analyze(low_contrast_threshold=params['low_contrast_threshold'],
@@ -99,7 +99,7 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
         json.dump(result_dict, json_file, indent=4)
 
     log_message('Analysis completed.')
-
+'''
 def push_to_server(result_folder, config, log_message):
     
     temp_folder = config['temp_folder']
@@ -142,7 +142,7 @@ def push_to_server(result_folder, config, log_message):
     result_data['file'] = uploaded_zip_filename
 
     # POST the result.json to the API
-    url = url = config['webservice_url'] +'/leedstorresults'
+    url = url = config['webservice_url'] +'/qckvresults'
     res = webservice_helper.post(obj=result_data, url=url)
 
     if res != None:
@@ -153,4 +153,4 @@ def push_to_server(result_folder, config, log_message):
         raise Exception('Failed posting catphan result!')
 
     return result_data
-
+'''

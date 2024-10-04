@@ -3,6 +3,9 @@ import re
 import requests
 from datetime import datetime
 import os
+import util
+import model_helper
+import obj_helper
 
 # Post the Measurement1D array to the API
 def post_measurements(measurements, url):
@@ -55,6 +58,80 @@ def upload_zip_file(filepath, url):
     except Exception as e:
         print(f"Error while uploading zip file: {e}")
 
+def post_analysis_result(result_folder, config, url, log_message):
+    
+    temp_folder = config['temp_folder']
+    
+    if not result_folder or not os.path.exists(result_folder):
+        raise Exception("The result folder not found.")
+    
+    # Zip the input folder
+    log_message(f"Zipping input folder: {result_folder}")
+    zip_filepath = util.zip_folder(result_folder, f'catphan_', temp_folder)
+    log_message(f"Result folder zipped at: {zip_filepath}")
+    
+    # Get the upload URL from config
+    zip_upload_url = config['webservice_url'] + '/upload'
+
+    # Upload the zip file to the server
+    log_message(f"Uploading zip file: {zip_filepath} to {zip_upload_url}")
+    res = upload_zip_file(zip_filepath, zip_upload_url)
+
+    if res != None:
+        log_message("Zip file uploaded successfully.")
+        log_message(f"Removing zip file....{zip_filepath}")
+        os.remove(zip_filepath)
+
+        uploaded_zip_filename = res['fileName']
+    else:
+        raise Exception("Failed uplaoding zip file!")
+
+    # Ensure the result.json file exists
+    result_json = os.path.join(result_folder, 'result.json')
+
+    if not os.path.exists(result_json):
+        raise Exception("The result.json file does not exist. Run the analysis first.")
+
+    # Read the result.json file
+    with open(result_json, 'r') as json_file:
+        result_data = json.load(json_file)
+
+    # add zip filename
+    result_data['file'] = uploaded_zip_filename
+
+    # POST the result.json to the API
+    res = post(obj=result_data, url=url)
+
+    if res != None:
+        # Assuming the API returns the created document with the _id field
+        if '_id' in res:
+            document_id = res['_id']
+    else:
+        raise Exception('Failed posting catphan result!')
+
+    return result_data
+
+def post_result_as_measurement1ds(result_data, app, site_id, device_id, phantom_id, url, log):
+    # travese the result object and collect numbers
+    log('collecting numbers from the result file...')
+    kvps = obj_helper.traverse_and_collect_numbers(result_data)
+
+    # convert the numbers key value pairs to measurement objects
+    log('converting numbers kvps to measurement1d objects...')
+    measurements = model_helper.convert_kvps_to_measurement1d(key_value_pairs=kvps, 
+                                                            key_prefix=f'{phantom_id.lower()}_',
+                                                            device_id=f'{site_id}|{device_id}', 
+                                                            app=app)
+
+    log(f'posting the measurement1d array to the server... url={url}')
+    res = post(measurements, url=url)
+    if res != None:
+        log("Post succeeded!")
+        return res
+    else:
+        log("Post failed!")
+        return None
+        
 if __name__ == '__main__':
     # Example usage with a result.json object
     result_json = {

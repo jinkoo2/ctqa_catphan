@@ -1,7 +1,7 @@
 import os
 import shutil
 import json
-from pylinac import StandardImagingFC2
+from pylinac import LasVegas
 
 from util import obj_serializer
 import util
@@ -25,15 +25,25 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
 
     # Catphan analysis logic
     log_message('Running analysis...')
-    phantom = StandardImagingFC2(input_file)
+    phantom = LasVegas(input_file)
     params = config['analysis_params']
     
-    phantom.analyze(
-        invert=False,
-        fwxm=params['fwxm'],
-        bb_edge_threshold_mm=params['bb_edge_threshold_mm']
+    phantom.analyze(low_contrast_threshold=params['low_contrast_threshold'],
+                #high_contrast_threshold=params['high_contrast_threshold'],
+                #invert=False,
+                #angle_override=False,
+                #center_override=False,
+                #size_override=False,
+                ssd=params['ssd'],
+                low_contrast_method=params['low_contrast_method'],
+                visibility_threshold=params['visibility_threshold'],
+                #x_adjustment=params['x_adjustment'],
+                #y_adjustment=params['y_adjustment'],
+                #angle_adjustment=params['angle_adjustment'],
+                #roi_size_factor=params['roi_size_factor'],
+                #scaling_factor=params['scaling_factor']
     )
-
+    
     # print results
     log_message(phantom.results())
 
@@ -89,7 +99,7 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
         json.dump(result_dict, json_file, indent=4)
 
     log_message('Analysis completed.')
-
+'''
 def push_to_server(result_folder, config, log_message):
     
     temp_folder = config['temp_folder']
@@ -132,7 +142,7 @@ def push_to_server(result_folder, config, log_message):
     result_data['file'] = uploaded_zip_filename
 
     # POST the result.json to the API
-    url = url = config['webservice_url'] +'/fc2results'
+    url = url = config['webservice_url'] +'/lasvegasresults'
     res = webservice_helper.post(obj=result_data, url=url)
 
     if res != None:
@@ -143,4 +153,4 @@ def push_to_server(result_folder, config, log_message):
         raise Exception('Failed posting catphan result!')
 
     return result_data
-
+'''

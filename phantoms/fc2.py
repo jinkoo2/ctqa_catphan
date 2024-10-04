@@ -1,7 +1,7 @@
 import os
 import shutil
 import json
-from pylinac import StandardImagingQC3
+from pylinac import StandardImagingFC2
 
 from util import obj_serializer
 import util
@@ -25,31 +25,21 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
 
     # Catphan analysis logic
     log_message('Running analysis...')
-    qc3 = StandardImagingQC3(input_file)
+    phantom = StandardImagingFC2(input_file)
     params = config['analysis_params']
     
-    qc3.analyze(low_contrast_threshold=params['low_contrast_threshold'],
-                high_contrast_threshold=params['high_contrast_threshold'],
-                #invert=False,
-                #angle_override=False,
-                #center_override=False,
-                #size_override=False,
-                ssd=params['ssd'],
-                low_contrast_method=params['low_contrast_method'],
-                visibility_threshold=params['visibility_threshold'],
-                #x_adjustment=params['x_adjustment'],
-                #y_adjustment=params['y_adjustment'],
-                #angle_adjustment=params['angle_adjustment'],
-                #roi_size_factor=params['roi_size_factor'],
-                #scaling_factor=params['scaling_factor']
+    phantom.analyze(
+        invert=False,
+        fwxm=params['fwxm'],
+        bb_edge_threshold_mm=params['bb_edge_threshold_mm']
     )
 
     # print results
-    log_message(qc3.results())
+    log_message(phantom.results())
 
     file = os.path.join(output_dir, 'analyzed_image.png')
     log_message(f'saving image: {file}')
-    qc3.save_analyzed_image(filename=file)
+    phantom.save_analyzed_image(filename=file)
 
     # copy logo file
     logo_file = config['publish_pdf_params']['logo']
@@ -67,11 +57,11 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
         log_message('logo_file not found. using default logo image.')
     
     # Save the results as PDF, TXT, and JSON
-    result_pdf = os.path.join(output_dir, config['publish_pdf_params']['filename'])
+    result_pdf = os.path.join(output_dir, 'result.pdf')
     log_message(f'Saving result PDF: {result_pdf}')
     params = config['publish_pdf_params']
 
-    qc3.publish_pdf(
+    phantom.publish_pdf(
         filename=result_pdf,
         notes=notes,
         open_file=True,
@@ -82,9 +72,9 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
     result_txt = os.path.join(output_dir, 'result.txt')
     log_message(f'Saving result TXT: {result_txt}')
     with open(result_txt, 'w') as file:
-        file.write(qc3.results())
+        file.write(phantom.results())
     
-    result = qc3.results_data()
+    result = phantom.results_data()
     result_json = os.path.join(output_dir, 'result.json')
 
     result_dict = json.loads(json.dumps(vars(result), default=obj_serializer))
@@ -99,7 +89,7 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
         json.dump(result_dict, json_file, indent=4)
 
     log_message('Analysis completed.')
-
+'''
 def push_to_server(result_folder, config, log_message):
     
     temp_folder = config['temp_folder']
@@ -142,7 +132,7 @@ def push_to_server(result_folder, config, log_message):
     result_data['file'] = uploaded_zip_filename
 
     # POST the result.json to the API
-    url = url = config['webservice_url'] +'/qc3results'
+    url = url = config['webservice_url'] +'/fc2results'
     res = webservice_helper.post(obj=result_data, url=url)
 
     if res != None:
@@ -153,4 +143,4 @@ def push_to_server(result_folder, config, log_message):
         raise Exception('Failed posting catphan result!')
 
     return result_data
-
+'''

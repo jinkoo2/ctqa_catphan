@@ -369,16 +369,17 @@ class PyLinacGuiApp:
 
     def run_analysis(self):
         try:
-            module_name = self.phantom().lower()
-            self.log(f'Loading module...{module_name}')
-            module = importlib.import_module(module_name)
+            module = self.get_phantom_module()
             self.phantom_config = self.load_phantom_config()
 
             metadata=self.phantom_config['publish_pdf_params']['metadata']
             metadata['Performed By'] = self.performed_by_combobox.get()
             metadata['Performed Date'] = self.performed_date_entry.get() 
+            
+            config_notes = self.phantom_config['publish_pdf_params'].get('notes', '')
+            user_notes =  self.notes_text.get("1.0", tk.END).strip()
 
-            notes = self.notes_text.get("1.0", tk.END).strip()
+            notes = f'{user_notes}\n{config_notes}'                
 
             if self.get_phantom_dim() == 2:
                 module.run_analysis(device_id=self.device_id(),
@@ -488,25 +489,16 @@ class PyLinacGuiApp:
         site_id = self.site()
         device_id = self.device()
 
-        # travese the result object and collect numbers
-        self.log('collecting numbers from the result file...')
-        kvps = obj_helper.traverse_and_collect_numbers(result_data)
-
-        # convert the numbers key value pairs to measurement objects
-        self.log('converting numbers kvps to measurement1d objects...')
-        measurements = model_helper.convert_kvps_to_measurement1d(key_value_pairs=kvps, 
-                                                                key_prefix=f'{self.phantom().lower()}_',
-                                                                device_id=f'{site_id}|{device_id}', 
-                                                                app=app)
-
-        self.log(f'posting the measurement1d array to the server... url={url}')
-        res = webservice_helper.post(measurements, url=url)
-        if res != None:
-            self.log("Post succeeded!")
-            return res
-        else:
-            self.log("Post failed!")
-            return None
+        webservice_helper.post_result_as_measurement1ds(
+            result_data=result_data,
+            app=app,
+            site_id=site_id,
+            device_id=device_id,
+            phantom_id=self.phantom().lower(),
+            url=url,
+            log=self.log)
+        
+        
 
     def record_result_thread(self):
         if not hasattr(self, 'analysis_result_folder') or not os.path.exists(self.analysis_result_folder):
@@ -516,6 +508,11 @@ class PyLinacGuiApp:
         # Run analysis in a separate thread
         threading.Thread(target=self.record_result).start()
 
+
+    def get_phantom_module(self):
+        module_name =f'phantoms.{self.phantom().lower()}'
+        self.log(f'Loading module...{module_name}')
+        return importlib.import_module(module_name)
 
     def record_result(self):
         
@@ -527,12 +524,12 @@ class PyLinacGuiApp:
         self.progress_bar.start()
 
         try:
-            module_name = self.phantom().lower()
-            self.log(f'Loading module...{module_name}')
-            phantom_module = importlib.import_module(module_name)
+            #phantom_module = self.get_phantom_module()
 
-            result_data = phantom_module.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log)
-                
+            #result_data = phantom_module.push_to_server(result_folder=self.analysis_result_folder, config = self.config, log_message=self.log)
+
+            url = self.config['webservice_url'] +f'/{self.phantom().lower()}results'
+            result_data = webservice_helper.post_analysis_result(result_folder=self.analysis_result_folder, config = self.config, url=url, log_message=self.log)   
             self.record_result_as_measurement1ds(result_data)
 
         except Exception as e:

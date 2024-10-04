@@ -1,7 +1,7 @@
 import os
 import shutil
 import json
-from pylinac import LasVegas
+from pylinac import StandardImagingQC3
 
 from util import obj_serializer
 import util
@@ -25,11 +25,11 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
 
     # Catphan analysis logic
     log_message('Running analysis...')
-    phantom = LasVegas(input_file)
+    qc3 = StandardImagingQC3(input_file)
     params = config['analysis_params']
     
-    phantom.analyze(low_contrast_threshold=params['low_contrast_threshold'],
-                #high_contrast_threshold=params['high_contrast_threshold'],
+    qc3.analyze(low_contrast_threshold=params['low_contrast_threshold'],
+                high_contrast_threshold=params['high_contrast_threshold'],
                 #invert=False,
                 #angle_override=False,
                 #center_override=False,
@@ -43,13 +43,13 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
                 #roi_size_factor=params['roi_size_factor'],
                 #scaling_factor=params['scaling_factor']
     )
-    
+
     # print results
-    log_message(phantom.results())
+    log_message(qc3.results())
 
     file = os.path.join(output_dir, 'analyzed_image.png')
     log_message(f'saving image: {file}')
-    phantom.save_analyzed_image(filename=file)
+    qc3.save_analyzed_image(filename=file)
 
     # copy logo file
     logo_file = config['publish_pdf_params']['logo']
@@ -67,11 +67,11 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
         log_message('logo_file not found. using default logo image.')
     
     # Save the results as PDF, TXT, and JSON
-    result_pdf = os.path.join(output_dir, 'result.pdf')
+    result_pdf = os.path.join(output_dir, config['publish_pdf_params']['filename'])
     log_message(f'Saving result PDF: {result_pdf}')
     params = config['publish_pdf_params']
 
-    phantom.publish_pdf(
+    qc3.publish_pdf(
         filename=result_pdf,
         notes=notes,
         open_file=True,
@@ -82,9 +82,9 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
     result_txt = os.path.join(output_dir, 'result.txt')
     log_message(f'Saving result TXT: {result_txt}')
     with open(result_txt, 'w') as file:
-        file.write(phantom.results())
+        file.write(qc3.results())
     
-    result = phantom.results_data()
+    result = qc3.results_data()
     result_json = os.path.join(output_dir, 'result.json')
 
     result_dict = json.loads(json.dumps(vars(result), default=obj_serializer))
@@ -99,7 +99,7 @@ def run_analysis(device_id, input_file, output_dir, config, notes, metadata, log
         json.dump(result_dict, json_file, indent=4)
 
     log_message('Analysis completed.')
-
+'''
 def push_to_server(result_folder, config, log_message):
     
     temp_folder = config['temp_folder']
@@ -142,7 +142,7 @@ def push_to_server(result_folder, config, log_message):
     result_data['file'] = uploaded_zip_filename
 
     # POST the result.json to the API
-    url = url = config['webservice_url'] +'/lasvegasresults'
+    url = url = config['webservice_url'] +'/qc3results'
     res = webservice_helper.post(obj=result_data, url=url)
 
     if res != None:
@@ -153,4 +153,4 @@ def push_to_server(result_folder, config, log_message):
         raise Exception('Failed posting catphan result!')
 
     return result_data
-
+'''
